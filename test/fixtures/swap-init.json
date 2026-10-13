@@ -1,0 +1,26 @@
+{
+  "challengeId": "00000000-0000-4000-8000-000000000066",
+  "dateExpires": "2026-10-13T22:43:47.675Z",
+  "transaction": {
+    "syncedOwnerId": "00000000-0000-4000-8000-000000000001",
+    "sourceAccountId": "ffff0000000000000000000000000065",
+    "destinationAccountId": "ffff0000000000000000000000000067",
+    "amount": "2000",
+    "currency": "EUR",
+    "status": "PENDING_2FA_CONFIRMATION",
+    "txType": "SWAP_CURRENCY_INITIATED",
+    "parentWalletId": "00000000-0000-4000-8000-000000000002",
+    "feeEstimate": {
+      "totalFee": "0",
+      "networkFee": "0",
+      "ourFee": "0",
+      "theirFee": "0",
+      "feeCurrency": "EUR"
+    }
+  },
+  "verificationMethod": "sms",
+  "availableVerificationMethods": [
+    "sms"
+  ],
+  "fallbackViaResend": false
+}

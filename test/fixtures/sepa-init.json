@@ -1,0 +1,28 @@
+{
+  "challengeId": "00000000-0000-4000-8000-000000000070",
+  "dateExpires": "2026-10-13T22:44:10.177Z",
+  "transaction": {
+    "syncedOwnerId": "00000000-0000-4000-8000-000000000001",
+    "sourceAccountId": "ffff0000000000000000000000000065",
+    "amount": "1000",
+    "currency": "EUR",
+    "status": "PENDING_2FA_CONFIRMATION",
+    "txType": "SEPA_PAYOUT_INITIATED",
+    "memo": "walk",
+    "parentWalletId": "00000000-0000-4000-8000-000000000002",
+    "iban": "DE89000000000000003000",
+    "bic": "COBADEFFXXX"
+  },
+  "feeEstimate": {
+    "totalFee": "0",
+    "networkFee": "0",
+    "ourFee": "0",
+    "theirFee": "0",
+    "feeCurrency": "EUR"
+  },
+  "verificationMethod": "sms",
+  "availableVerificationMethods": [
+    "sms"
+  ],
+  "fallbackViaResend": false
+}

@@ -1,0 +1,43 @@
+{
+  "id": "00000000-0000-4000-8000-000000000068",
+  "sourceSyncedOwnerId": "00000000-0000-4000-8000-000000000001",
+  "destinationSyncedOwnerId": "00000000-0000-4000-8000-000000000001",
+  "sourceAccountId": "ffff0000000000000000000000000065",
+  "destinationAccountId": "ffff0000000000000000000000000067",
+  "datetime": "2026-10-13T22:38:49.269Z",
+  "status": "COMMITTED",
+  "txType": "CURRENCY_EXCHANGE",
+  "order": {
+    "id": "00000000-0000-4000-8000-000000000069",
+    "price": "0.91",
+    "type": "buy",
+    "ticker": "USDCEUR",
+    "debit": {
+      "currency": "EUR",
+      "amountFloat": "20",
+      "amount": "2000"
+    },
+    "credit": {
+      "currency": "USDC",
+      "amountFloat": "21.97",
+      "amount": "2197"
+    }
+  },
+  "balanceBefore": {
+    "amount": "10000",
+    "balance": "10000",
+    "currency": "cents"
+  },
+  "balanceAfter": {
+    "amount": "8000",
+    "balance": "8000",
+    "currency": "cents"
+  },
+  "feeEstimate": {
+    "totalFee": "0",
+    "networkFee": "0",
+    "ourFee": "0",
+    "theirFee": "0",
+    "feeCurrency": "EUR"
+  }
+}

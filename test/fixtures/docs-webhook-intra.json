@@ -1,0 +1,22 @@
+{
+  "type": "INTRA_LEDGER_SEND",
+  "id": "00000000-0000-4000-8000-000000000064",
+  "accountId": "ffff0000000000000000000000000024",
+  "syncedOwnerId": "00000000-0000-4000-8000-000000000026",
+  "sourceSyncedOwnerId": "00000000-0000-4000-8000-000000000026",
+  "destinationSyncedOwnerId": "00000000-0000-4000-8000-000000000026",
+  "debit": "100000",
+  "timestamp": "2023-08-22T14:24:24.099Z",
+  "txType": "INTRA_LEDGER_SEND",
+  "memo": "Intraledger ffff0000000000000000000000000024 to ffff0000000000000000000000000044",
+  "memoPayer": "grow impactful deliverables",
+  "exchangeRate": "1",
+  "balanceBefore": {
+    "amount": "459696",
+    "currency": "cents"
+  },
+  "balanceAfter": {
+    "amount": "359696",
+    "currency": "cents"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "id": "00000000-0000-4000-8000-000000000071",
+  "accountId": "ffff0000000000000000000000000065",
+  "syncedOwnerId": "00000000-0000-4000-8000-000000000001",
+  "sourceSyncedOwnerId": "00000000-0000-4000-8000-000000000001",
+  "debit": "1000",
+  "currency": "EUR",
+  "timestamp": "2026-10-13T22:39:11.539Z",
+  "txType": "SEPA_PAYOUT_INITIATED",
+  "memo": "SEPA_PAYOUT_INITIATED 10 EUR CWzMs0x7Sz",
+  "exchangeRate": "1",
+  "balanceBefore": {
+    "amount": "8000",
+    "balance": "8000",
+    "currency": "cents"
+  },
+  "balanceAfter": {
+    "amount": "7000",
+    "balance": "7000",
+    "currency": "cents"
+  },
+  "bankingSenderIban": "GB50000000000000002758",
+  "bankingSenderBic": "SEOUGB21",
+  "bankingSenderName": "Ada Sandbox",
+  "bankingPaymentType": "SEPA",
+  "feeEstimate": {
+    "totalFee": "0",
+    "networkFee": "0",
+    "ourFee": "0",
+    "theirFee": "0",
+    "feeCurrency": "EUR"
+  }
+}

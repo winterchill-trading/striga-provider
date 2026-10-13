@@ -1,0 +1,25 @@
+{
+  "transactions": [
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "credit": 495,
+      "debit": 0,
+      "timestamp": "2022-08-16T12:25:45.054Z",
+      "txType": "LN_INCOMING_CONFIRMED",
+      "hash": "eeee000000000000000000000000000000000000000000000000000000000022",
+      "otherCryptoIdentifier": "lntb5u1p30hr9vpp5s7f8sxwxt3njma4mh2tplk3zez8hrmswh9kd8ed9u56yyjw69sjsdplwdukuerfvdshgefqv9c8qmrfvdshg6t0deejqmtfwdekjmmw943hy6t5d93kzmqcqzpgxqzjhsp5cuvar0tv55qf7sh5thf476f8kqg8vuyvnfedtghv4ngxz4tramuq9qyyssqjtmtg0apf99km6d3ndylahkm8lvedv2nuwnsc2sfqme85ey2q8pz0qz9asx7m28s0x3yg3vtr09dpw44u5dekzxc50dua7u4l5en75sqtq05dq",
+      "feeBaseCurrency": 5e-08,
+      "nonFpFeeBaseCurrency": 5,
+      "balanceBefore": {
+        "amount": 0,
+        "currency": "satoshis"
+      },
+      "balanceAfter": {
+        "amount": 495,
+        "currency": "satoshis"
+      }
+    }
+  ],
+  "count": 1,
+  "total": 1
+}
