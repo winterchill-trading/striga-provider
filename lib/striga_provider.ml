@@ -9,3 +9,4 @@ module Card_map = Card_map
 module Tx_map = Tx_map
 module Card_tx_map = Card_tx_map
 module Store = Store
+module Adapter = Adapter
