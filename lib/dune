@@ -1,0 +1,18 @@
+(library
+ (name striga_provider)
+ (public_name striga-provider)
+ (libraries
+  core
+  async
+  async_kernel
+  yojson
+  zarith
+  money
+  ledger
+  kyc-core
+  payments-core
+  card-core
+  banking-provider
+  striga-client)
+ (preprocess
+  (pps ppx_jane)))
