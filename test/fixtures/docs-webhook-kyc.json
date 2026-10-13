@@ -1,0 +1,34 @@
+{
+  "userId": "00000000-0000-4000-8000-000000000059",
+  "status": "REJECTED",
+  "details": [
+    "BAD_PROOF_OF_ADDRESS"
+  ],
+  "rejectionComments": {},
+  "currentTier": 2,
+  "tier0": {
+    "eligible": false,
+    "status": "NOT_STARTED"
+  },
+  "tier1": {
+    "eligible": false,
+    "status": "APPROVED",
+    "inboundLimitConsumed": {
+      "all": "0",
+      "va": "0"
+    },
+    "inboundLimitAllowed": {
+      "all": "1500000",
+      "va": "1000000"
+    }
+  },
+  "tier2": {
+    "eligible": true,
+    "status": "REJECTED"
+  },
+  "tier3": {
+    "eligible": false,
+    "status": "NOT_STARTED"
+  },
+  "ts": 1732703202876
+}

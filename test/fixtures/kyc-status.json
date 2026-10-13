@@ -1,0 +1,41 @@
+{
+  "userId": "00000000-0000-4000-8000-000000000001",
+  "emailVerified": true,
+  "mobileVerified": true,
+  "details": [],
+  "currentTier": 1,
+  "status": "APPROVED",
+  "tier0": {
+    "eligible": false,
+    "status": "NOT_STARTED",
+    "outboundLimitConsumed": "0",
+    "outboundLimitAllowed": "1500000"
+  },
+  "tier1": {
+    "eligible": true,
+    "status": "APPROVED",
+    "inboundLimitConsumed": {
+      "all": "0",
+      "va": "0"
+    },
+    "inboundLimitAllowed": {
+      "all": "2500000",
+      "va": "1500000"
+    },
+    "outboundLimitConsumed": "0",
+    "outboundLimitAllowed": "1000000"
+  },
+  "tier2": {
+    "eligible": true,
+    "status": "NOT_STARTED",
+    "outboundLimitConsumed": "0",
+    "outboundLimitAllowed": "10000000"
+  },
+  "tier3": {
+    "eligible": false,
+    "status": "NOT_STARTED",
+    "outboundLimitConsumed": "0",
+    "outboundLimitAllowed": "10000000"
+  },
+  "rejectionComments": {}
+}
