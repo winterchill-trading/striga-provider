@@ -6,3 +6,4 @@ module Kyc_map = Kyc_map
 module Account_map = Account_map
 module Striga_time = Striga_time
 module Card_map = Card_map
+module Tx_map = Tx_map
