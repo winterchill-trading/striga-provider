@@ -3,3 +3,5 @@
 module Units = Units
 module Refs = Refs
 module Kyc_map = Kyc_map
+module Account_map = Account_map
+module Striga_time = Striga_time
