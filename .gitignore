@@ -1,0 +1,7 @@
+_build/
+_build-*/
+_opam/
+.env
+.env.*
+!.env.example
+*.install
