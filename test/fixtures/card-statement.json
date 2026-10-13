@@ -1,0 +1,26 @@
+{
+  "transactions": [
+    {
+      "relatedCardTransactionId": "00000000-0000-4000-8000-000000000058",
+      "type": "CARD_AUTHORIZATION_DECLINED",
+      "originalAmount": 12.34,
+      "originalCurrency": "EUR",
+      "transactionAmount": 12.34,
+      "transactionCurrency": "EUR",
+      "merchantId": "StrigaSimulator",
+      "merchantName": "Striga Simulator",
+      "merchantCity": "Tallinn",
+      "merchantCountryCode": "EST",
+      "merchantCategoryCode": "5812",
+      "linkedAccountId": "ffff0000000000000000000000000003",
+      "createdAt": "2026-10-13T22:05:42.170Z",
+      "declineDetails": "Not Sufficient Funds",
+      "merchantTransactionAmount": "12.34",
+      "merchantTransactionCurrency": "EUR",
+      "accountTransactionAmount": "12.34",
+      "accountTransactionCurrency": "EUR"
+    }
+  ],
+  "count": 1,
+  "total": 1
+}

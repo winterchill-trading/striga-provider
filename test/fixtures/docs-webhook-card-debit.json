@@ -1,0 +1,26 @@
+{
+  "type": "CARD_AUTHORIZATION",
+  "id": "00000000-0000-4000-8000-000000000061",
+  "accountId": "ffff0000000000000000000000000062",
+  "syncedOwnerId": "00000000-0000-4000-8000-000000000026",
+  "sourceSyncedOwnerId": "00000000-0000-4000-8000-000000000026",
+  "debit": "4193529",
+  "timestamp": "2023-08-23T11:41:38.302Z",
+  "txType": "CARD_AUTHORIZATION",
+  "memo": "Card Authorization 00000000-0000-4000-8000-000000000063 of 1000 EUR at Striga Simulator",
+  "exchangeRate": "23966",
+  "balanceBefore": {
+    "amount": "30180397",
+    "currency": "satoshis"
+  },
+  "balanceAfter": {
+    "amount": "25986868",
+    "currency": "satoshis"
+  },
+  "relatedCardTransactionId": "00000000-0000-4000-8000-000000000061",
+  "isCardAuthorizationHold": true,
+  "relatedCardId": "00000000-0000-4000-8000-000000000060",
+  "relatedCardSettlementId": "AUTHORIZATION_PENDING_CLEARING",
+  "cardTransactionAmount": "1000",
+  "cardTransactionCurrency": "EUR"
+}

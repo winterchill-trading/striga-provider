@@ -1,0 +1,14 @@
+{
+  "transaction": {
+    "cardId": "00000000-0000-4000-8000-000000000072",
+    "amount": 12.34,
+    "currencyCode": "EUR",
+    "merchantCategoryCode": "5812",
+    "merchantId": "StrigaSimulator",
+    "merchantName": "Striga Simulator",
+    "merchantCity": "Tallinn",
+    "merchantCountryCode": "EST",
+    "date": "2026-10-13T22:39:26.220Z"
+  },
+  "response": "APPROVED"
+}
