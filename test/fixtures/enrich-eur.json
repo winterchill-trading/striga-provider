@@ -1,0 +1,21 @@
+{
+  "accountId": "ffff0000000000000000000000000065",
+  "ownerId": "00000000-0000-4000-8000-000000000001",
+  "currency": "EUR",
+  "status": "ACTIVE",
+  "internalAccountId": "EUR00000000002233",
+  "bankCountry": "GB",
+  "bankAddress": "The Bower, 207-211 Old Street, London, England, EC1V 9NR",
+  "iban": "GB29NWBK60161331926819",
+  "bic": "NWBKGB2L",
+  "accountNumber": "000002758",
+  "bankName": "Simulator Bank",
+  "bankAccountHolderName": "ADA SANDBOX",
+  "provider": "SIMULATOR",
+  "paymentType": null,
+  "domestic": false,
+  "routingCodeEntries": [],
+  "payInReference": null,
+  "bban": null,
+  "bankPostalCode": "SE1 9PA"
+}

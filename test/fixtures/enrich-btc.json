@@ -1,0 +1,20 @@
+{
+  "accountId": "ffff0000000000000000000000000003",
+  "ownerId": "00000000-0000-4000-8000-000000000001",
+  "currency": "BTC",
+  "blockchainDepositAddress": "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
+  "blockchainNetwork": {
+    "name": "Bitcoin Testnet 3",
+    "network": "Bitcoin"
+  },
+  "multiChainSupport": false,
+  "blockchainNetworks": [],
+  "depositAddresses": [
+    {
+      "network": "Bitcoin",
+      "address": "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
+      "status": "ACCOUNT_ENRICHED",
+      "createdAt": "2026-10-13T22:05:17.977Z"
+    }
+  ]
+}

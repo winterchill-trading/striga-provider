@@ -1,0 +1,20 @@
+{
+  "accountId": "ffff0000000000000000000000000005",
+  "ownerId": "00000000-0000-4000-8000-000000000001",
+  "currency": "ETH",
+  "blockchainDepositAddress": "0x0000000000000000000000000000000000000030",
+  "blockchainNetwork": {
+    "name": "Ethereum Test (Sepolia)",
+    "network": "Ethereum"
+  },
+  "multiChainSupport": false,
+  "blockchainNetworks": [],
+  "depositAddresses": [
+    {
+      "network": "Ethereum",
+      "address": "0x0000000000000000000000000000000000000030",
+      "status": "ACCOUNT_ENRICHED",
+      "createdAt": "2026-10-13T22:05:19.660Z"
+    }
+  ]
+}

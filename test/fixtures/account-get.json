@@ -1,0 +1,47 @@
+{
+  "accountId": "ffff0000000000000000000000000003",
+  "parentWalletId": "00000000-0000-4000-8000-000000000002",
+  "currency": "BTC",
+  "ownerId": "00000000-0000-4000-8000-000000000001",
+  "ownerType": "CONSUMER",
+  "createdAt": "2026-10-13T22:04:04.574Z",
+  "availableBalance": {
+    "amount": "0",
+    "currency": "satoshis",
+    "hAmount": "0.00000000",
+    "fiatEquivalentBalance": "0",
+    "fiatCurrency": "EUR",
+    "hFiatEquivalentBalance": "0",
+    "rate": "74454.6"
+  },
+  "linkedCardId": "UNLINKED",
+  "blockchainDepositAddress": "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
+  "blockchainNetwork": {
+    "name": "Bitcoin Testnet 3",
+    "network": "Bitcoin"
+  },
+  "status": "ACTIVE",
+  "permissions": [
+    "CUSTODY",
+    "TRADE",
+    "INTER",
+    "INTRA"
+  ],
+  "enriched": true,
+  "parentApplicationId": "00000000-0000-4000-8000-0000000000aa",
+  "syncedOwnerId": "00000000-0000-4000-8000-000000000001",
+  "accountPath": "00000000-0000-4000-8000-000000000002:BTC",
+  "blockchainNetworks": [
+    {
+      "name": "Bitcoin Testnet 3",
+      "network": "Bitcoin"
+    }
+  ],
+  "multiChainSupport": false,
+  "depositAddresses": [
+    {
+      "network": "Bitcoin",
+      "address": "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"
+    }
+  ]
+}
