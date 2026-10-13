@@ -1,0 +1,24 @@
+(library
+ (name striga_provider_test)
+ (libraries
+  striga-provider
+  striga-client
+  banking-provider
+  core
+  core_unix
+  async
+  async_kernel
+  yojson
+  money
+  ledger
+  kyc-core
+  payments-core
+  card-core
+  expect_test_helpers_core)
+ (inline_tests
+  (deps
+   (glob_files fixtures/*.json))
+  (flags
+   (:standard -source-tree-root .)))
+ (preprocess
+  (pps ppx_jane)))
