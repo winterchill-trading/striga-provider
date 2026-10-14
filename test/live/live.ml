@@ -11,17 +11,24 @@ let config ~run_id =
   ; poll_interval = Time_ns.Span.of_sec 3.
   ; (* The sandbox's fixed OTP. *)
     sca_code = Sensitive.of_string "123456"
-  ; (* The sandbox accepts the textbook German example IBAN for payouts (the
-       striga-client walk used it). *)
+  ; (* The sandbox accepts the textbook German example IBAN for payouts (the striga-client
+       walk used it). *)
     payee_iban = "DE89370400440532013000"
   }
 ;;
 
 let run () =
-  let run_id = sprintf "sp%d" (Time_ns.to_int_ns_since_epoch (Time_ns.now ()) / 1_000_000_000) in
+  let run_id =
+    sprintf "sp%d" (Time_ns.to_int_ns_since_epoch (Time_ns.now ()) / 1_000_000_000)
+  in
   match
     Striga_provider.Adapter.of_env
-      ~config:{ Striga_provider.Adapter.Config.default with sandbox_settlement = `Immediate }
+      ~config:
+        { Striga_provider.Adapter.Config.default with
+          sandbox_settlement = `Immediate
+        ; (* The suite's timeout should decide, not the adapter's shorter default. *)
+          provisioning_timeout = (config ~run_id).timeout
+        }
       ()
   with
   | Error e ->
@@ -45,7 +52,8 @@ let run () =
         in
         let took = Time_ns.diff (Time_ns.now ()) started in
         (match result with
-         | Ok () -> Core.printf "ok    %s (%s)\n%!" s.name (Time_ns.Span.to_short_string took)
+         | Ok () ->
+           Core.printf "ok    %s (%s)\n%!" s.name (Time_ns.Span.to_short_string took)
          | Error e ->
            Core.printf
              "FAIL  %s (%s)\n      %s\n%!"
@@ -57,8 +65,11 @@ let run () =
     List.iter (Striga_provider.Adapter.background_errors adapter) ~f:(fun e ->
       Core.printf "background: %s\n" (Error.to_string_hum e));
     let failed = List.count results ~f:Result.is_error in
-    Core.printf "conformance on the Striga sandbox: %d passed, %d failed\n%!"
-      (List.length results - failed) failed
+    Core.printf
+      "conformance on the Striga sandbox: %d passed, %d failed\n%!"
+      (List.length results - failed)
+      failed;
+    if failed > 0 then Stdlib.exit 1
 ;;
 
 let () =
@@ -71,5 +82,7 @@ let () =
        STRIGA_LIVE_TESTS=1)"
   else
     Command_unix.run
-      (Command.async ~summary:"conformance suite on the Striga sandbox" (Command.Param.return run))
+      (Command.async
+         ~summary:"conformance suite on the Striga sandbox"
+         (Command.Param.return run))
 ;;
