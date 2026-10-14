@@ -1,4 +1,4 @@
-(** {!Banking_provider.Provider.S} and {!Banking_provider.Provider.Sandbox} over the
+(** {!Banking_provider.Provider.S} and {!Banking_provider.Sandbox.S} over the
     Striga API ([striga-client]).
 
     {b Ids.} A customer is the Striga user, an account [<user id>/<account id>] ({!Refs}),
@@ -62,7 +62,7 @@ val of_env : ?config:Config.t -> ?store:Store.t -> unit -> t Or_error.t
 val transport : t -> Striga_client.Transport.t
 
 include Provider.S with type t := t
-include Provider.Sandbox with type t := t
+include Sandbox.S with type t := t
 
 (** {2 Striga-specific} *)
 

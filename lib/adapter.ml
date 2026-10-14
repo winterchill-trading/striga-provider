@@ -1643,7 +1643,7 @@ let simulate_deposit t ~account ~(rail : Rail.t) amount =
            [%message "the Striga simulator only credits EUR by SEPA" (rail : Rail.t)]))
 ;;
 
-let simulate_kyc_decision t customer (decision : Provider.Kyc_decision.t) =
+let simulate_kyc_decision t customer (decision : Sandbox.Kyc_decision.t) =
   sandbox_only t (fun () ->
     let user_id = Refs.user_id customer in
     track_user t ~user_id;
