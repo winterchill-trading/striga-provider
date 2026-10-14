@@ -109,6 +109,9 @@ striga-client.
 
 ## Known gaps
 
+- **No payee check.** Striga's API has no verification of payee, so `verify_payee` and
+  `simulate_payee_check` answer an error, and the conformance scenario for them fails.
+  The UK rails are refused.
 - **EUR and USDC accounts in the sandbox (open question for the sandbox application's
   settings).** In both runs the sandbox never provisioned them after a simulated KYC
   approval (crypto accounts only), with a German and with an Estonian test person alike,
