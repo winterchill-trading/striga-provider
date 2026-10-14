@@ -812,8 +812,10 @@ let quote_fee _t ~from:_ ~(rail : Rail.t) amount =
             the transfer to see the fee"
              (rail : Rail.t)])
   | Card_scheme -> return (Or_error.error_string "not a transfer rail")
-  | Faster_payments | Chaps | Bacs ->
-    return (Or_error.error_s [%message "Striga does not pay on UK rails" (rail : Rail.t)])
+  | Faster_payments | Chaps | Bacs | Ach _ | Rtp | Fedwire ->
+    return
+      (Or_error.error_s
+         [%message "Striga does not pay on UK or US rails" (rail : Rail.t)])
 ;;
 
 let network_code (n : Network.t) =
@@ -823,6 +825,8 @@ let network_code (n : Network.t) =
   | Polygon -> Ok "POLYGON"
   | Solana -> Ok "SOL"
   | Tron -> Or_error.error_string "Striga does not withdraw to Tron"
+  | (Base | Arbitrum | Plasma | Spark) as n ->
+    Or_error.error_s [%message "Striga does not withdraw to this network" (n : Network.t)]
 ;;
 
 let initiate_striga t ~user_id ~account_id (draft : Transfer.t) ~amount =
@@ -900,8 +904,10 @@ let initiate_striga t ~user_id ~account_id (draft : Transfer.t) ~amount =
          (Or_error.error_string
             "Striga pays BOLT 11 invoices only; resolve LNURL and addresses first"))
   | _, Card_scheme -> return (Or_error.error_string "not a transfer rail")
-  | _, ((Faster_payments | Chaps | Bacs) as rail) ->
-    return (Or_error.error_s [%message "Striga does not pay on UK rails" (rail : Rail.t)])
+  | _, ((Faster_payments | Chaps | Bacs | Ach _ | Rtp | Fedwire) as rail) ->
+    return
+      (Or_error.error_s
+         [%message "Striga does not pay on UK or US rails" (rail : Rail.t)])
   | External _, _ ->
     return (Or_error.error_string "an outgoing transfer needs a beneficiary")
 ;;
