@@ -1794,3 +1794,13 @@ let ping t =
        [ingest_webhook]. *)
     publish t (event ~id:("ping:local:" ^ stamp) ~at:(now ()) Ping))
 ;;
+
+(* The provider's sandbox has no switch for automatic KYC outcomes or deposit timing;
+   demos drive it with the simulate_* calls instead. *)
+let set_kyc_simulation (_ : t) ?customer:_ (_ : Sandbox.Kyc_simulation.t) =
+  Sandbox.unsupported ~operation:"set_kyc_simulation"
+;;
+
+let set_deposit_simulation (_ : t) ?customer:_ (_ : Sandbox.Deposit_simulation.t) =
+  Sandbox.unsupported ~operation:"set_deposit_simulation"
+;;
