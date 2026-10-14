@@ -74,7 +74,10 @@ otherwise it prints one line and passes, which is what CI sees. Each run creates
 sandbox users prefixed with a timestamp. Offline, the mappings are tested on recorded and
 documented Striga bodies in `test/fixtures` (ids and IBANs redacted).
 
-Last sandbox run (2026-10-14, 11 scenarios, 6 minute timeout each): 4 passed, 7 failed.
+Sandbox runs on 2026-10-14 (11 scenarios, 6 minute timeout each), first with the suite's
+default person (German resident), then with the Estonian profile striga-client's live walk
+had been given an EUR account with (`test/live/live.ml`): 4 passed, 7 failed both times,
+with the same scenarios.
 
 | Scenario                                                   | Result |
 | ---------------------------------------------------------- | ------ |
@@ -92,7 +95,8 @@ Last sandbox run (2026-10-14, 11 scenarios, 6 minute timeout each): 4 passed, 7 
 
 Every failure has the same cause: after the simulated KYC approval (tier 1 `APPROVED`)
 the sandbox provisioned the crypto accounts (BTC, ETH, BNB, POL, SOL) within seconds but
-no EUR or USDC account, neither within the timeout nor about an hour later. Every
+no EUR or USDC account, neither within the timeout nor (first run) about an hour later.
+The person's residence and mobile made no difference. Every
 EUR-dependent scenario starts by opening an EUR account, so none of them reached the
 deposit, payment, SCA or card steps. The suite has no crypto scenarios, so the sandbox's
 lack of crypto funding does not show here.
@@ -105,12 +109,14 @@ striga-client.
 
 ## Known gaps
 
-- **EUR and USDC accounts in the sandbox.** In the last run the sandbox never provisioned
-  them after a simulated KYC approval (crypto accounts only), so deposits, SEPA payouts
-  with SCA, wrong-code handling, double-initiation and cards were not exercised live by
-  this adapter. Earlier SDK-level runs saw EUR appear minutes after approval; whether this
-  is an application setting, the test person's residence (the suite's person lives in
-  Germany, the SDK walk's in Estonia) or a sandbox outage is not known.
+- **EUR and USDC accounts in the sandbox (open question for the sandbox application's
+  settings).** In both runs the sandbox never provisioned them after a simulated KYC
+  approval (crypto accounts only), with a German and with an Estonian test person alike,
+  so deposits, SEPA payouts with SCA, wrong-code handling, double-initiation and cards
+  were not exercised live by this adapter. Earlier SDK-level runs saw EUR appear minutes
+  after approval, so the likely cause is on the sandbox side: whether the application
+  still has EUR banking (Payment Accounts) enabled needs checking in the dashboard. The
+  adapter does not change that application-wide setting.
 - **No crypto funding in the sandbox**: on-chain, crypto intraledger and Lightning
   payouts stop at Striga's balance or invoice checks; `simulate_deposit` credits EUR by
   SEPA only.
