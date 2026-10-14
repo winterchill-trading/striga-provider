@@ -200,6 +200,9 @@ let incoming ~account ~own_iban (t : Tx.t) : Event.Kind.t option Or_error.t =
                 { name = "on-chain sender"
                 ; detail = Option.value t.blockchain_source_address ~default:""
                 } )
+        | Faster_payments | Chaps | Bacs ->
+          Or_error.error_s
+            [%message "Striga reports no deposits on UK rails" (rail : Rail.t)]
         | Intraledger | Card_scheme ->
           return
             ( Transfer.Details.Intraledger
