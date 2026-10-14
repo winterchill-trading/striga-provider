@@ -1,0 +1,22 @@
+; The conformance suite against the Striga sandbox. [dune test] runs it, but it only
+; talks to Striga when the credentials are set and STRIGA_LIVE_TESTS=1; otherwise it
+; prints one line and exits 0, which is what CI (no credentials) sees. Each run creates
+; sandbox users.
+
+(executable
+ (name live)
+ (libraries
+  core
+  async
+  core_unix.command_unix
+  banking-provider
+  money
+  striga-client
+  striga-provider)
+ (preprocess
+  (pps ppx_jane)))
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:live.exe})))
