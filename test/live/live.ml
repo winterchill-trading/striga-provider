@@ -3,10 +3,44 @@ open! Async
 open Banking_provider
 module Suite = Conformance.Make (Striga_provider.Adapter) (Striga_provider.Adapter)
 
+(* The profile striga-client's live walk was given an EUR account with: an Estonian
+   resident with an Estonian mobile. With the suite's German default person the sandbox
+   provisioned only the crypto accounts. Names stay synthetic. *)
+let person ~run_id =
+  let open Kyc_core in
+  let stamp = String.filter run_id ~f:Char.is_digit in
+  { Person.given_name = Pii.create "Ada"
+  ; family_name = Pii.create "Sandbox"
+  ; date_of_birth = Pii.create (Date.create_exn ~y:1990 ~m:Jan ~d:15)
+  ; nationality = Pii.create (Country.of_string "EE")
+  ; residential_address =
+      Pii.create
+        { Address.line1 = "Sepapaja 6"
+        ; line2 = None
+        ; city = "Tallinn"
+        ; region = None
+        ; postal_code = Some "11415"
+        ; country = Country.of_string "EE"
+        }
+  ; email = Pii.create "hello@winterchill.xyz"
+  ; mobile = Pii.create ("+3725" ^ String.suffix (String.make 7 '0' ^ stamp) 7)
+  }
+;;
+
+(* [hello+striga-<customer id>@winterchill.xyz]: unique per customer, as Striga wants. *)
+let email_for customer_id ~email:_ =
+  let tag =
+    String.filter_map (Kyc_core.Customer_id.to_string customer_id) ~f:(fun c ->
+      if Char.is_alphanum c || Char.equal c '-' then Some (Char.lowercase c) else None)
+  in
+  sprintf "hello+striga-%s@winterchill.xyz" tag
+;;
+
 let config ~run_id =
   let base = Conformance.Config.default ~run_id in
   { base with
-    (* EUR accounts appear minutes after a simulated KYC approval. *)
+    person = person ~run_id
+  ; (* EUR accounts appear minutes after a simulated KYC approval. *)
     timeout = Time_ns.Span.of_min 6.
   ; poll_interval = Time_ns.Span.of_sec 3.
   ; (* The sandbox's fixed OTP. *)
@@ -26,6 +60,7 @@ let run () =
       ~config:
         { Striga_provider.Adapter.Config.default with
           sandbox_settlement = `Immediate
+        ; email_for
         ; (* The suite's timeout should decide, not the adapter's shorter default. *)
           provisioning_timeout = (config ~run_id).timeout
         }

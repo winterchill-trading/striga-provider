@@ -10,6 +10,7 @@
   async
   core_unix.command_unix
   banking-provider
+  kyc-core
   money
   striga-client
   striga-provider)
