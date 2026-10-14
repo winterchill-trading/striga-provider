@@ -1,5 +1,5 @@
-(** {!Banking_provider.Provider.S} and {!Banking_provider.Sandbox.S} over the
-    Striga API ([striga-client]).
+(** {!Banking_provider.Provider.S} and {!Banking_provider.Sandbox.S} over the Striga API
+    ([striga-client]).
 
     {b Ids.} A customer is the Striga user, an account [<user id>/<account id>] ({!Refs}),
     a card the Striga card. Striga has no idempotency keys and no field for our ids, so
