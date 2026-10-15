@@ -12,6 +12,7 @@
   banking-provider
   kyc-core
   money
+  payments-core
   striga-client
   striga-provider)
  (preprocess

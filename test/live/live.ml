@@ -60,6 +60,12 @@ let run () =
       ~config:
         { Striga_provider.Adapter.Config.default with
           sandbox_settlement = `Immediate
+        ; (* Striga's SEPA payout needs a BIC; the suite's payee carries none. *)
+          bic_for =
+            (fun iban ->
+              if String.equal (Payments_core.Iban.to_string iban) "DE89370400440532013000"
+              then Some (Payments_core.Bic.of_string_exn "COBADEFFXXX")
+              else None)
         ; email_for
         }
       ()
