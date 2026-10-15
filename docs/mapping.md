@@ -38,7 +38,7 @@ store first. A `Store_pg` in the consuming service keeps these across restarts.
 | `enrich_account`        | `POST /wallets/account/enrich`, `POST /wallets/get/account`              | IBAN for EUR, deposit addresses for crypto |
 | `statement`             | `POST /wallets/get/account`, `POST /wallets/get/account/statement` (paged) | entries mapped by `Tx_map` |
 | `quote_fee`             | none                                                                     | SEPA and intraledger: zero (the application charges none); on-chain and Lightning: error (Striga estimates only at initiation) |
-| `initiate_transfer`     | SEPA: `POST /wallets/send/initiate/bank`; intraledger: `POST /wallets/send/intra/initiate`; on-chain: `POST /wallets/whitelist-address` then `POST /wallets/send/initiate/onchain`; Lightning: `POST /wallets/send/initiate/lightning` | always returns a challenge; the fee is the initiation's `feeEstimate` |
+| `initiate_transfer`     | SEPA: `POST /wallets/send/initiate/bank` (needs a BIC: beneficiary, SEPA details, then `Config.bic_for`; to an IBAN of an account the adapter knows, intraledger instead); intraledger: `POST /wallets/send/intra/initiate`; on-chain: `POST /wallets/whitelist-address` then `POST /wallets/send/initiate/onchain`; Lightning: `POST /wallets/send/initiate/lightning` | always returns a challenge; the fee is the initiation's `feeEstimate` |
 | `transfer`              | `POST /wallets/account/get-transactions-by-id`, else the statement       | |
 | `cancel_transfer`       | none                                                                     | only before the code is confirmed: the initiation lapses at Striga |
 | `confirm_sca`           | transfers and swaps: `POST /wallets/transaction/confirm`; card details: `POST /card/confirm-consent` | `41009`/`41010` wrong code; `61004`/`31090` insufficient funds becomes `Failed Insufficient_funds` |
@@ -154,6 +154,11 @@ anything else to `Blocked`. Limits are whole euros: `transactionPurchase`,
 `dailyPurchase`, `monthlyPurchase`, `dailyWithdrawal`, and the online, contactless and ATM
 toggles. The PAN component's `cardAuthToken` (from `/card/confirm-consent`) becomes a
 `Pan_display_token.t` valid 24 hours.
+
+Event ids from ledger entries are `tx:<transaction id>:<txType>`; the credit side of an
+`INTRA_LEDGER_SEND` or `INTER_LEDGER_SEND` (same id and type on the payee's statement)
+ends in `:in`. A confirmed transfer publishes its entry's own update under the entry's
+id (Submitted for a SEPA payout, Settled for an intraledger move).
 
 ## Gaps
 
