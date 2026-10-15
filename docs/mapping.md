@@ -15,6 +15,7 @@ what has no Striga counterpart. Paths are relative to `/api/v1`.
 | `Sca.Id.t`               | `striga:<challenge id>`                  | `Store.Challenge_record`                |
 | `Swap.Id.t`              | none until executed (`swp-<uuid>`)       | `Store.Swap_record`                     |
 | card `request_id`        | none                                     | `Store.find_card_request`               |
+| card display token       | `cardAuthToken` (24 hours)               | `Store.find_card_token`                 |
 | `Card_id.t`              | card id                                  | the id itself                           |
 | `Event_id.t`             | derived from Striga data (see Events)    | none: both poll and webhook derive it   |
 
@@ -31,9 +32,9 @@ store first. A `Store_pg` in the consuming service keeps these across restarts.
 | `start_verification`    | Email: `POST /user/resend-email`; Mobile: `POST /user/resend-sms`; document, liveness, address, source of funds: `POST /user/kyc/start` with the tier | returns `Code_sent` or `Hosted` (verification link, else the SDK token) |
 | `complete_verification` | `POST /user/verify-email`, `POST /user/verify-mobile`                    | hosted steps are decided at Striga; this reads `GET /user/kyc/{id}` |
 | `kyc_status`            | `GET /user/kyc/{id}`                                                     | publishes the change as events |
-| `open_account`          | `GET /user/{id}` + `POST /wallets/get/all` (polled)                     | Striga opens one account per enabled currency itself after KYC; opening is waiting up to `provisioning_timeout` |
+| `open_account`          | EUR: `POST /user/payment-account/consent/get`, then `/consent/set` if none; `GET /user/{id}` + `POST /wallets/get/all`; if the currency is not listed and is EUR or USDC, `POST /user/login/start` + `/user/login/complete` (sandbox code); listing retried for `account_retry`; EUR: then `enrich_account` | Striga opens one account per enabled currency itself on KYC approval, but lists EUR and USDC only for a user with an SCA session |
 | `accounts`              | `GET /user/{id}`, `POST /wallets/get/all`                                | currencies `money` does not know are skipped |
-| `balance`               | `POST /wallets/get/account`                                              | `posted = available`, no holds (see `Account_map`) |
+| `balance`               | `POST /wallets/get/account`                                              | `posted = available`, no holds (see `Account_map`); a `30070` answer opens a session (sandbox) and retries once |
 | `enrich_account`        | `POST /wallets/account/enrich`, `POST /wallets/get/account`              | IBAN for EUR, deposit addresses for crypto |
 | `statement`             | `POST /wallets/get/account`, `POST /wallets/get/account/statement` (paged) | entries mapped by `Tx_map` |
 | `quote_fee`             | none                                                                     | SEPA and intraledger: zero (the application charges none); on-chain and Lightning: error (Striga estimates only at initiation) |
@@ -43,18 +44,18 @@ store first. A `Store_pg` in the consuming service keeps these across restarts.
 | `confirm_sca`           | transfers and swaps: `POST /wallets/transaction/confirm`; card details: `POST /card/confirm-consent` | `41009`/`41010` wrong code; `61004`/`31090` insufficient funds becomes `Failed Insufficient_funds` |
 | `quote_swap`            | `POST /wallets/get/account`, `POST /trade/rates`                         | quote held locally (Striga has no quote id) |
 | `execute_swap`          | `POST /wallets/swap`, then the challenge                                 | |
-| `issue_virtual_card`    | `GET /user/{id}`, `POST /card/create` (virtual), `GET /card/{id}`       | the create answer lacks fields, so the card is read back |
+| `issue_virtual_card`    | `GET /user/{id}`, `POST /card/create` (virtual), `GET /card/{id}`       | the create answer lacks fields, so the card is read back; the 3-D Secure password is checked against Striga's charset first |
 | `card`, `cards`         | `GET /card/{id}`, `POST /card/get-all`                                   | |
 | `set_card_status`       | Frozen: `POST /card/block`; Active: `POST /card/unblock`; Destroyed: `POST /card/burn` | Blocked, Requested, Expired cannot be set |
 | `set_card_limits`       | `PATCH /card/limits`, `PATCH /card/security`                             | EUR whole units only |
-| `card_details_token`    | none server-side; `card_consent_started` + `confirm_sca` (`/card/confirm-consent`) | the consent starts in Striga's browser component |
+| `card_details_token`    | none server-side; `card_consent_started` + `confirm_sca` (`/card/confirm-consent`) | the consent starts in Striga's browser component; the token is kept in the store |
 | `create_standing_order`, `cancel_standing_order` | none                            | Striga standing orders convert deposits; they are not scheduled payments |
 | `events`                | polling `GET /user/kyc/{id}`, the account statements, `POST /card/statement` | only while subscribed |
 | `ingest_webhook`        | none (verifies with `Webhook.verify_and_parse`)                          | |
 
 | `Sandbox.S`                 | Striga endpoint(s)                                                   | Notes |
 | --------------------------- | -------------------------------------------------------------------- | ----- |
-| `simulate_deposit`          | `PATCH /simulate/accounts/deposit`, then the statement (polled)      | EUR by SEPA only; found again by its memo, as the simulator returns no id |
+| `simulate_deposit`          | `PATCH /simulate/accounts/deposit`, then the statement (polled up to `deposit_timeout`) | EUR by SEPA only, in cents; the credit lands asynchronously within seconds; found again by its memo, as the simulator returns no id |
 | `simulate_kyc_decision`     | `POST /user/verify-email`, `/user/verify-mobile` (code `123456`), `POST /user/kyc/start`, `PATCH /simulate/user/kyc` | `Approve` APPROVED, `Reject` REJECTED_FINAL, `Request_resubmission` REJECTED with labels |
 | `simulate_card_auth`        | `POST /simulate/card/authorization`, then `GET /card/{id}`, `POST /card/statement` | the simulator says only APPROVED/DECLINED; the code comes from the card's status or `declineDetails` |
 | `simulate_transfer_outcome` | `PATCH /simulate/sepa`                                               | SEPA payouts only: `Settled` completes, `Rejected`/`Failed`/`Returned` fail |
@@ -137,6 +138,13 @@ A customer approved at tier 1 stays `Approved` when an upgrade to tier 2 is reje
 Striga allows five attempts per challenge without reporting how many remain, so
 `attempts_left` is counted locally. Each confirmation carries the end user's IP, which
 `Provider.S` does not; `Config.end_user_ip` is sent.
+
+Striga's SCA session (a login confirmed by SMS, 180 days, revoked by a 2FA reset) gates
+EUR and USDC: without one, `/wallets/get` and `/wallets/get/all` leave those accounts
+out and `/wallets/get/account` answers 403 `30070` `SCA_REQUIRED` (reason `NO_SESSION`).
+On the sandbox the adapter opens a session itself with `Config.sandbox_code`; elsewhere
+the application calls `start_session` (`POST /user/login/start`, SMS) and
+`complete_session` (`POST /user/login/complete`) with the customer's code.
 
 ## Cards
 
