@@ -23,6 +23,7 @@ module Config = struct
     ; email_for : Kyc_core.Customer_id.t -> email:string -> string
     ; sandbox_settlement : [ `Immediate | `Manual ]
     ; card_3ds_password : unit -> string
+    ; bic_for : Iban.t -> Bic.t option
     }
 
   (* [local+tag@domain]: Striga refuses a second user with the same e-mail, and test runs
@@ -87,6 +88,7 @@ module Config = struct
     ; email_for = tagged_email
     ; sandbox_settlement = `Manual
     ; card_3ds_password = random_password
+    ; bic_for = (fun _ -> None)
     }
   ;;
 end
@@ -966,21 +968,50 @@ let initiate_striga t ~user_id ~account_id (draft : Transfer.t) ~amount =
   | Beneficiary b, (Sepa_credit | Sepa_instant) ->
     (match b.destination with
      | Bank_account { iban; bic } ->
-       let bic =
-         match bic, draft.details with
-         | Some bic, _ -> Bic.to_string bic
-         | None, Sepa { creditor = { bic = Some bic; _ }; _ } -> Bic.to_string bic
-         | None, _ -> ""
+       let memo =
+         Option.some_if (not (String.is_empty draft.reference)) draft.reference
        in
-       Sc.Payment.sepa
-         t.tr
-         ~user_id
-         ~source_account_id:account_id
-         ~amount
-         ~iban:(Iban.to_string iban)
-         ~bic
-         ?memo:(Option.some_if (not (String.is_empty draft.reference)) draft.reference)
-         ()
+       let own =
+         Hashtbl.to_alist t.ibans
+         |> List.find_map ~f:(fun (account, i) ->
+           Option.some_if (Iban.equal i iban) account)
+       in
+       (match own with
+        | Some destination_account_id ->
+          (* Striga refuses SEPA to an IBAN of its own application (31003 "use the
+             inter/intra methods"); move the money on its ledger instead. *)
+          Sc.Payment.intraledger
+            t.tr
+            ~user_id
+            ~source_account_id:account_id
+            ~destination_account_id
+            ~amount
+            ?memo
+            ()
+        | None ->
+          let bic =
+            match bic, draft.details with
+            | Some bic, _ -> Some bic
+            | None, Sepa { creditor = { bic = Some bic; _ }; _ } -> Some bic
+            | None, _ -> t.config.bic_for iban
+          in
+          (match bic with
+           | None ->
+             (* Without one Striga answers 400 00002 "Invalid BIC". *)
+             return
+               (Or_error.error_string
+                  "Striga needs the payee's BIC for a SEPA payout: put it on the \
+                   beneficiary or answer it from Config.bic_for")
+           | Some bic ->
+             Sc.Payment.sepa
+               t.tr
+               ~user_id
+               ~source_account_id:account_id
+               ~amount
+               ~iban:(Iban.to_string iban)
+               ~bic:(Bic.to_string bic)
+               ?memo
+               ()))
      | _ -> return (Or_error.error_string "SEPA needs a bank account beneficiary"))
   | Beneficiary b, Intraledger ->
     (match b.destination with

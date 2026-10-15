@@ -55,6 +55,10 @@ module Config : sig
     ; card_3ds_password : unit -> string
     (** for new virtual cards; must pass {!valid_3ds_password}, or issuing fails before
         calling Striga *)
+    ; bic_for : Payments_core.Iban.t -> Payments_core.Bic.t option
+    (** the payee's BIC when neither the beneficiary nor the SEPA details carry one;
+        Striga's SEPA payout needs it. A payout to an IBAN of one of this application's
+        Striga accounts goes by intraledger instead and needs none. *)
     }
 
   (** Polls every 3 s, looks for a new account for 30 s, waits a minute for a simulated
