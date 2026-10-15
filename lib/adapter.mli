@@ -64,6 +64,10 @@ module Config : sig
       Secure password. *)
   val default : t
 
+  (** The default [email_for]: [local+<customer id>@domain], with the tag cut and ended by
+      a digest of the id when the local part would pass Striga's 64 characters. *)
+  val tagged_email : Kyc_core.Customer_id.t -> email:string -> string
+
   (** Striga's rule for 3-D Secure passwords: 8-36 characters from letters, digits and the
       symbols listed in Striga's card reference (the double quote, backslash and
       [!#;:?&*()+=/,.[]{}]; no hyphen or at sign). Striga also wants a strong one, so this

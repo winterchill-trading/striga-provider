@@ -63,3 +63,25 @@ let%expect_test "the default 3-D Secure password meets Striga's rule" =
     |}];
   return ()
 ;;
+
+let%expect_test "a tagged e-mail keeps its local part within 64 characters" =
+  let show id =
+    let e =
+      Adapter.Config.tagged_email
+        (Kyc_core.Customer_id.of_string id)
+        ~email:"hello@winterchill.xyz"
+    in
+    let local = List.hd_exn (String.split e ~on:'@') in
+    printf "%s %d\n" e (String.length local)
+  in
+  show "sp1792042557-deposit";
+  show (String.concat (List.init 8 ~f:(fun _ -> "customer-0123456789")));
+  show (String.concat (List.init 8 ~f:(fun _ -> "customer-0123456788")));
+  [%expect
+    {|
+    hello+sp1792042557-deposit@winterchill.xyz 26
+    hello+customer-0123456789customer-0123456789custome-5212f4443925@winterchill.xyz 64
+    hello+customer-0123456788customer-0123456788custome-fe1006734ce1@winterchill.xyz 64
+    |}];
+  return ()
+;;

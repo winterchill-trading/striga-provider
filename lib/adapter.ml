@@ -26,15 +26,26 @@ module Config = struct
     }
 
   (* [local+tag@domain]: Striga refuses a second user with the same e-mail, and test runs
-     reuse one synthetic person. Tags keep only characters every mail system accepts. *)
+     reuse one synthetic person. Tags keep only characters every mail system accepts. A
+     local part over 64 characters is refused ([00002] "Invalid e-mail ID"), so a long tag
+     is cut and ends in a digest of the whole customer id to stay unique. *)
   let tagged_email customer_id ~email =
+    let id = Kyc_core.Customer_id.to_string customer_id in
     let tag =
-      String.filter_map (Kyc_core.Customer_id.to_string customer_id) ~f:(fun c ->
+      String.filter_map id ~f:(fun c ->
         if Char.is_alphanum c || Char.equal c '-' then Some (Char.lowercase c) else None)
     in
     match String.lsplit2 email ~on:'@' with
     | Some (local, domain) ->
       let local = List.hd_exn (String.split local ~on:'+') in
+      let room = 64 - String.length local - 1 in
+      let tag =
+        if String.length tag <= room
+        then tag
+        else (
+          let digest = String.prefix (Md5.to_hex (Md5.digest_string id)) 12 in
+          String.prefix tag (Int.max 0 (room - 13)) ^ "-" ^ digest)
+      in
       sprintf "%s+%s@%s" local tag domain
     | None -> email
   ;;
