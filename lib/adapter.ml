@@ -1739,8 +1739,8 @@ let simulate_deposit t ~account ~(rail : Rail.t) amount =
     | (Sepa_credit | Sepa_instant), Ok (user_id, account_id), Ok cents ->
       track_account t account;
       incr deposit_counter;
-      (* The reference comes back as the entry's memo, which is how the deposit is found
-         again: the simulator answers without a transaction id. *)
+      (* The reference comes back at the end of the entry's memo, which is how the deposit
+         is found again: the simulator answers without a transaction id. *)
       let reference =
         sprintf
           "sim-%d-%d"
@@ -1766,7 +1766,10 @@ let simulate_deposit t ~account ~(rail : Rail.t) amount =
                read_statement t ~user_id ~account_id ~start ~stop
              in
              List.find txs ~f:(fun (tx : Sc.Transaction.t) ->
-               Option.equal String.equal tx.memo (Some reference)
+               Option.exists tx.memo ~f:(fun memo ->
+                 (* The sandbox writes "SEPA_PAYIN_COMPLETED 100 EUR <reference>". *)
+                 String.equal memo reference
+                 || String.is_suffix memo ~suffix:(" " ^ reference))
                && Option.equal
                     Sc.Transaction.Tx_type.equal
                     tx.tx_type
