@@ -70,13 +70,22 @@ Do not poll in a loop.
 - The provider takes no idempotency keys. Idempotent creates live in the adapter's `Store`, which only
   an in-memory implementation ships here; a lost create response is recovered by a lookup by e-mail
   (unique per user at the provider) before creating again.
-- The sandbox provisions accounts in stages, and some currencies may never appear for a given sandbox
-  application. Do not shorten a scenario's wait in the adapter; let the suite's timeout decide, and record
-  the gap in `README.md` if it persists.
+- Striga lists EUR and USDC accounts only while the user has an SCA session; they exist from KYC
+  approval on. Do not reintroduce a long "provisioning" wait: open the session (the adapter does it on the
+  sandbox; elsewhere the application calls `start_session`/`complete_session`) and retry the listing briefly
+  (`Config.account_retry`). A 2FA reset revokes the session; reads answering `30070` reopen it once.
+- Striga's SEPA payout needs a BIC (`Config.bic_for` when the beneficiary has none); an IBAN of the
+  same application must go intraledger (`31003`).
+- An intraledger move appears on both statements with the same id and type; the credit side's event
+  id ends in `:in`, so both parties get their event.
 - `banking-provider` moved its sandbox interface to `Sandbox.S`. An adapter's `.mli` needs
   `include Sandbox.S with type t := t`, and the `Conformance.Make` functor takes the adapter twice.
 - A simulated deposit returns no transaction id. Tag it with a unique reference and find it on the
-  statement by its memo.
+  statement by its memo, which the sandbox writes as `SEPA_PAYIN_COMPLETED <amount> EUR <reference>`.
+- The 3-D Secure password must stay inside Striga's charset (no hyphen); `Config.valid_3ds_password`
+  checks it.
+- Card display tokens and every id link go through `Store.t`; keep new persisted state there, not in
+  adapter hash tables.
 - Fixtures: replace ids with placeholders and scrub sender names and personal data. Addresses and IBANs
   in fixtures are public test values chosen so that the payments-core checksum accepts them; keep them so.
 - Provider-side decline reasons are on the statement, not on the authorisation response.
