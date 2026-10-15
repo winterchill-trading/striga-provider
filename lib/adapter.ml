@@ -17,6 +17,7 @@ module Config = struct
     ; account_retry : Time_ns.Span.t
     ; deposit_timeout : Time_ns.Span.t
     ; sandbox_code : string
+    ; auto_session : unit -> bool
     ; payment_account_consent : [ `Record of string option | `By_application ]
     ; statement_window : Time_ns.Span.t
     ; end_user_ip : string
@@ -80,6 +81,7 @@ module Config = struct
     ; (* The simulator credits a deposit asynchronously, within seconds. *)
       deposit_timeout = Time_ns.Span.of_min 1.
     ; sandbox_code = "123456"
+    ; auto_session = (fun () -> true)
     ; payment_account_consent = `Record None
     ; statement_window = Time_ns.Span.day
     ; (* The address the striga-client sandbox runs used; Striga only checks that it is
@@ -418,14 +420,31 @@ let poll_until ~timeout ~every f =
    2FA reset revokes it). Without one the accounts exist but are left out of the listing,
    and reading one answers 403 [30070] [SCA_REQUIRED]. *)
 
-let start_session t customer =
+module Session_challenge = struct
+  type t =
+    { challenge_id : string
+    ; expires_at : Time_ns.t option
+    }
+  [@@deriving sexp_of]
+end
+
+let begin_session t customer =
   let user_id = Refs.user_id customer in
   let%bind.Deferred.Or_error (ch : Sc.Sca.Login_challenge.t) =
     Sc.Sca.login_start t.tr ~user_id ~verification_method:Sms
   in
   match ch.challenge_id with
-  | Some id -> return (Ok id)
+  | Some challenge_id ->
+    return
+      (Ok
+         { Session_challenge.challenge_id
+         ; expires_at = Option.bind ch.date_expires ~f:Striga_time.parse
+         })
   | None -> return (Or_error.error_string "Striga's SMS login returned no challenge id")
+;;
+
+let start_session t customer =
+  Deferred.Or_error.map (begin_session t customer) ~f:(fun c -> c.challenge_id)
 ;;
 
 let complete_session t customer ~challenge_id ~code =
@@ -440,14 +459,19 @@ let complete_session t customer ~challenge_id ~code =
   |> Deferred.Or_error.ignore_m
 ;;
 
-(* The adapter can answer its own login only where the code is known: the sandbox. *)
+let session_required_tag = "Striga needs the customer's SCA session"
+
+let is_session_required e =
+  Sc.Api_error.is_sca_session_required e
+  || String.is_substring (Error.to_string_hum e) ~substring:session_required_tag
+;;
+
+(* The adapter can answer its own login only where the code is known (the sandbox) and
+   while the application lets it ([auto_session]); otherwise the error says a session is
+   needed ({!is_session_required}) and the application asks the customer. *)
 let open_session t ~user_id =
-  if not (is_sandbox t)
-  then
-    return
-      (Or_error.error_string
-         "Striga needs an SCA session for EUR and USDC accounts: open one with \
-          start_session and complete_session and the customer's SMS code")
+  if not (is_sandbox t && t.config.auto_session ())
+  then return (Or_error.error_s [%message session_required_tag user_id])
   else
     (let customer = Refs.customer ~user_id in
      let%bind.Deferred.Or_error challenge_id = start_session t customer in
@@ -459,8 +483,6 @@ let open_session t ~user_id =
     |> Deferred.Or_error.tag ~tag:"opening an SCA session"
 ;;
 
-(* Runs [f]; when Striga answers that the user has no SCA session, opens one (sandbox) and
-   runs [f] once more. *)
 let with_session t ~user_id f =
   match%bind f () with
   | Error e when Sc.Api_error.is_sca_session_required e ->

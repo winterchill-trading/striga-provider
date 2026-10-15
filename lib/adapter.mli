@@ -43,6 +43,10 @@ module Config : sig
     ; sandbox_code : string
     (** the sandbox's fixed one-time code, with which the adapter answers its own SMS
         login and the e-mail and mobile checks; used only against the sandbox host *)
+    ; auto_session : unit -> bool
+    (** asked each time a session is needed on the sandbox: [true] (the default) answers
+        Striga's SMS login with [sandbox_code]; [false] leaves it to the application, as
+        outside the sandbox ({!is_session_required}) *)
     ; payment_account_consent : [ `Record of string option | `By_application ]
     (** [`Record terms_version]: before opening the EUR account (Striga's Payment
         Account), record the customer's acceptance of its terms with [end_user_ip] unless
@@ -113,6 +117,21 @@ val card_consent_started
     [start_session] sends the customer an SMS and returns Striga's challenge id, and
     [complete_session] answers it with the customer's code. *)
 val start_session : t -> Customer_ref.t -> string Or_error.t Deferred.t
+
+module Session_challenge : sig
+  type t =
+    { challenge_id : string
+    ; expires_at : Time_ns.t option (** Striga's [dateExpires] *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** {!start_session} with the challenge's expiry, for a code prompt. *)
+val begin_session : t -> Customer_ref.t -> Session_challenge.t Or_error.t Deferred.t
+
+(** The error says the customer has no SCA session (Striga's [30070 SCA_REQUIRED], or the
+    adapter declining to open one itself): start one and ask for the code. *)
+val is_session_required : Error.t -> bool
 
 val complete_session
   :  t
