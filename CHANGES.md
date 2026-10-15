@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows
 - `Config.sandbox_code`, `Config.account_retry`, `Config.deposit_timeout` and
   `Config.payment_account_consent`.
 - `Config.valid_3ds_password` and `Config.random_password`.
+- `Config.bic_for`: the payee's BIC for a SEPA payout when the beneficiary has none.
+- `Config.tagged_email` (the default `email_for`).
 - `Store.find_card_token` and `Store.set_card_token`: the card display token is kept in
   the store, so a restart does not ask the cardholder for a new code.
 
@@ -28,11 +30,28 @@ All notable changes to this project are documented here. The format follows
   sandbox and retry once.
 - `simulate_deposit` waits `deposit_timeout` (1 minute) for the asynchronous credit.
 
+- A SEPA payout to an IBAN of an account the adapter knows goes intraledger (Striga
+  refuses SEPA inside one application with `31003`); without a BIC a SEPA payout is
+  refused before calling Striga.
+- The credit side of an intraledger move has its own event id (`...:in`).
+
 ### Removed
 
 - `Config.provisioning_timeout`.
 
 ### Fixed
+
+- A simulated deposit was never found: the sandbox's memo is
+  `SEPA_PAYIN_COMPLETED <amount> EUR <reference>`, not the bare reference. The reference
+  is now matched at the end of the memo.
+- After an intraledger payment was confirmed, neither side received an event: the
+  confirmation marked the entry's id as published under a Submitted update, and the
+  payee's entry shares that id. The confirmation now publishes the entry's own update
+  (Settled) and the payee's credit has its own id.
+- The tagged e-mail could pass the 64-character local part (`400 00002 "Invalid e-mail
+  ID"`); a long tag is now cut and ends in a digest of the customer id.
+- A code that is not six digits (`400 00002 "Invalid verificationCode"`) is a wrong code,
+  not an error.
 
 - The default 3-D Secure password contained hyphens, which are outside Striga's charset,
   so card creation was refused. The default now uses letters, digits and `#`/`!`, and a
