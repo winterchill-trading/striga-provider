@@ -26,9 +26,11 @@ module A = Striga_provider.Adapter
 
 let%bind.Deferred.Or_error adapter = return (A.of_env ()) in
 let%bind.Deferred.Or_error customer = A.create_customer adapter ~customer_id ~person in
-(* After KYC; Striga provisions the EUR account itself, open_account waits for it. *)
+(* After KYC approval. Striga lists EUR only for a customer with an SCA session: on the
+   sandbox open_account opens one itself; elsewhere call A.start_session and
+   A.complete_session with the customer's SMS code first. An EUR account comes back
+   enriched (with its IBAN). *)
 let%bind.Deferred.Or_error account = A.open_account adapter customer.id Money.Currency.eur in
-A.enrich_account adapter account.id  (* the IBAN *)
 ```
 
 A service passes its own `Store.t` (persisted links between our ids and Striga's; see
@@ -54,7 +56,7 @@ Credentials are read only from the environment and never logged.
 | Module         | What it does                                                                 |
 | -------------- | ---------------------------------------------------------------------------- |
 | `Adapter`      | `Provider.S`, `Sandbox.S`, webhook ingestion, the poller                     |
-| `Store`        | links Striga cannot hold (our customer, transfer, challenge, swap, card request ids), with an in-memory implementation |
+| `Store`        | links Striga cannot hold (our customer, transfer, challenge, swap, card request ids) and card display tokens, with an in-memory implementation |
 | `Refs`         | account and standing order refs carrying the Striga user id                 |
 | `Units`        | Striga tickers and smallest units to `Money` (USDC cents rescaled to micro-units) |
 | `Kyc_map`      | Striga tiers and statuses to kyc-core steps, status and events              |
@@ -74,52 +76,64 @@ otherwise it prints one line and passes, which is what CI sees. Each run creates
 sandbox users prefixed with a timestamp. Offline, the mappings are tested on recorded and
 documented Striga bodies in `test/fixtures` (ids and IBANs redacted).
 
-Sandbox runs on 2026-10-14 (11 scenarios, 6 minute timeout each), first with the suite's
-default person (German resident), then with the Estonian profile striga-client's live walk
-had been given an EUR account with (`test/live/live.ml`): 4 passed, 7 failed both times,
-with the same scenarios.
+Sandbox run on 2026-10-15 (14 scenarios; the suite has grown from 11, 2-minute timeout
+each, Estonian test person): **13 passed, 1 failed**. The run on 2026-10-14 passed 4 of
+11: every EUR scenario stopped at `open_account`, because Striga lists the EUR account
+only once the customer has an SCA session and the adapter was waiting for it to
+appear instead of opening one.
 
-| Scenario                                                   | Result |
-| ---------------------------------------------------------- | ------ |
-| create_customer is idempotent on our customer id           | pass   |
-| a KYC approval is published as an event and reported by kyc_status | pass |
-| a webhook with a bad signature is refused                  | pass   |
-| a test delivery arrives as a Ping event                    | pass   |
-| an approved customer gets an EUR account with an IBAN      | fail: no EUR account |
-| a deposit is published once and credits the balance       | fail: no EUR account |
-| a payment confirmed by SCA settles and debits amount plus fee | fail: no EUR account |
-| initiating the same transfer twice pays once               | fail: no EUR account |
-| a payment above the balance does not leave the account     | fail: no EUR account |
-| a wrong SCA code is refused without naming a factor        | fail: no EUR account |
-| a virtual card is approved, and declined with 57 once frozen | fail: no EUR account |
+| Scenario                                                   | 2026-10-14 | 2026-10-15 |
+| ---------------------------------------------------------- | ---------- | ---------- |
+| create_customer is idempotent on our customer id           | pass       | pass       |
+| a KYC approval is published as an event and reported by kyc_status | pass | pass |
+| an approved customer gets an EUR account with an IBAN      | fail       | pass       |
+| a deposit is published once and credits the balance       | fail       | pass       |
+| a payment confirmed by SCA settles and debits amount plus fee | fail    | pass       |
+| initiating the same transfer twice pays once               | fail       | pass       |
+| a payment above the balance does not leave the account     | fail       | pass       |
+| a wrong SCA code is refused without naming a factor        | fail       | pass       |
+| a webhook with a bad signature is refused                  | pass       | pass       |
+| a test delivery arrives as a Ping event                    | pass       | pass       |
+| a virtual card is approved, and declined with 57 once frozen | fail     | pass       |
+| an account keeps its details when opened and enriched again | not in the suite | pass |
+| a KYC decision set to wait comes after its delay           | not in the suite | pass |
+| verify_payee answers, and a simulated answer is returned   | not in the suite | fail: Striga offers no payee check |
 
-Every failure has the same cause: after the simulated KYC approval (tier 1 `APPROVED`)
-the sandbox provisioned the crypto accounts (BTC, ETH, BNB, POL, SOL) within seconds but
-no EUR or USDC account, neither within the timeout nor (first run) about an hour later.
-The person's residence and mobile made no difference. Every
-EUR-dependent scenario starts by opening an EUR account, so none of them reached the
-deposit, payment, SCA or card steps. The suite has no crypto scenarios, so the sandbox's
-lack of crypto funding does not show here.
+What it took, besides the session: the simulator's deposit memo reads
+`SEPA_PAYIN_COMPLETED 100 EUR <reference>`, so the deposit is found by the reference at
+the end of the memo; Striga's SEPA payout needs a BIC (`400 00002 "Invalid BIC"`
+without one), which the live run answers through `Config.bic_for`; a code that is not
+six digits fails as `400 00002 "Invalid verificationCode"` and is now a wrong code; the
+default 3-D Secure password had hyphens, outside Striga's charset.
 
-Verified live by this adapter: user creation and the lookup that makes it idempotent,
-e-mail and mobile verification, KYC start and the simulated approval, KYC polling into
-events, wallet listing (crypto accounts), webhook signature refusal, the webhook ping.
-Everything else is verified on fixtures here and live (at the SDK level) in
-striga-client.
+Verified live by this adapter: user creation and its idempotency, e-mail and mobile
+verification, KYC start and the simulated approval, KYC events, the SCA session (SMS
+login with the sandbox code), the Payment Account consent, EUR account listing and
+enrichment, simulated SEPA deposits, SEPA payouts confirmed by SMS code and settled by
+the simulator, double initiation, the overdraft refusal, the wrong-code path, virtual
+card issuing, simulated authorizations and the frozen-card decline, webhook signature
+refusal and the ping. Intraledger moves between two customers are verified on fixtures
+only (the suite has no intraledger scenario).
 
 ## Known gaps
 
 - **No payee check.** Striga's API has no verification of payee, so `verify_payee` and
   `simulate_payee_check` answer an error, and the conformance scenario for them fails.
   The UK and US rails are refused.
-- **EUR and USDC accounts in the sandbox (open question for the sandbox application's
-  settings).** In both runs the sandbox never provisioned them after a simulated KYC
-  approval (crypto accounts only), with a German and with an Estonian test person alike,
-  so deposits, SEPA payouts with SCA, wrong-code handling, double-initiation and cards
-  were not exercised live by this adapter. Earlier SDK-level runs saw EUR appear minutes
-  after approval, so the likely cause is on the sandbox side: whether the application
-  still has EUR banking (Payment Accounts) enabled needs checking in the dashboard. The
-  adapter does not change that application-wide setting.
+- **SCA session for EUR and USDC.** Striga lists and reads EUR and USDC accounts only
+  while the customer has an SCA session (180 days; a 2FA reset revokes it). On the
+  sandbox the adapter opens one itself with `Config.sandbox_code`; elsewhere the
+  application calls `start_session` and `complete_session` with the customer's SMS
+  code, or `open_account` and account reads fail with `30070` `SCA_REQUIRED`.
+- **SEPA needs a BIC.** Striga's payout takes IBAN plus BIC. The adapter uses the
+  beneficiary's BIC, then the SEPA details', then `Config.bic_for`; without one it
+  refuses before calling Striga. A payout to an IBAN of one of this application's
+  accounts known to the adapter goes intraledger, since Striga refuses it as SEPA
+  (`400 31003`, "use the inter/intra methods").
+- **Payment Account consent** is recorded by the adapter before the EUR account is
+  opened (`Config.payment_account_consent`, default `` `Record None ``, with
+  `end_user_ip`); a service that collects the customer's acceptance itself sets
+  `` `By_application ``.
 - **No crypto funding in the sandbox**: on-chain, crypto intraledger and Lightning
   payouts stop at Striga's balance or invoice checks; `simulate_deposit` credits EUR by
   SEPA only.
@@ -130,7 +144,7 @@ striga-client.
 - **Fee quotes** for on-chain and Lightning are only known once a payout is initiated;
   SEPA and intraledger quote zero (the sandbox application charges none).
 - **Card numbers**: `card_details_token` needs Striga's browser component to start the
-  consent (`card_consent_started`); card limits are whole euros only, without ATM counts,
+  consent (`card_consent_started`); the resulting token (24 hours) lives in the `Store`; card limits are whole euros only, without ATM counts,
   MCC or country block lists; `Blocked`, `Requested` and `Expired` cannot be set.
 - **`simulate_transfer_outcome`** covers confirmed SEPA payouts only.
 - **`ping`** publishes its own `Ping`: Striga answers 200 whether or not the delivery
