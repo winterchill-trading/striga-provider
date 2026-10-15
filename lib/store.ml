@@ -56,6 +56,10 @@ type t =
   ; set_swap : Swap_record.t -> unit Deferred.t
   ; find_card_request : string -> Card_core.Ids.Card_id.t option Deferred.t
   ; set_card_request : string -> Card_core.Ids.Card_id.t -> unit Deferred.t
+  ; find_card_token :
+      Card_core.Ids.Card_id.t -> Card_core.Pan_display_token.t option Deferred.t
+  ; set_card_token :
+      Card_core.Ids.Card_id.t -> Card_core.Pan_display_token.t -> unit Deferred.t
   }
 
 let memory () =
@@ -65,6 +69,7 @@ let memory () =
   let challenges = Hashtbl.create (module Sca.Id) in
   let swaps = Hashtbl.create (module Swap.Id) in
   let cards = Hashtbl.create (module String) in
+  let card_tokens = Hashtbl.create (module Card_core.Ids.Card_id) in
   let set tbl key data = Hashtbl.set tbl ~key ~data in
   { find_customer = (fun k -> return (Hashtbl.find customers k))
   ; set_customer = (fun k v -> return (set customers k v))
@@ -83,5 +88,7 @@ let memory () =
   ; set_swap = (fun (r : Swap_record.t) -> return (set swaps r.id r))
   ; find_card_request = (fun k -> return (Hashtbl.find cards k))
   ; set_card_request = (fun k v -> return (set cards k v))
+  ; find_card_token = (fun k -> return (Hashtbl.find card_tokens k))
+  ; set_card_token = (fun k v -> return (set card_tokens k v))
   }
 ;;

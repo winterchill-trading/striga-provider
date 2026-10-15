@@ -3,12 +3,16 @@
     Striga has no idempotency keys and no field for our ids, so the adapter keeps the
     links itself: our customer id to the Striga user, our transfer id to the Striga
     challenge and transaction, an SCA challenge to the Striga challenge it answers, a swap
-    quote until it is executed, a card request id to the card it issued.
+    quote until it is executed, a card request id to the card it issued, and the card
+    display token Striga returned after the cardholder's consent (valid 24 hours), so a
+    restart does not ask the cardholder for a new code.
 
     A service persists these in its own database by implementing {!t} (the records have
-    stable binary forms); {!memory} serves tests, the CLI and the conformance run, and
-    forgets everything when the process exits. Every write is keyed, so repeating one is
-    harmless. *)
+    stable binary forms; a card display token has no serializer on purpose, so a database
+    implementation stores {!Card_core.Pan_display_token.reveal_for_ui} and its expiry and
+    rebuilds it with {!Card_core.Pan_display_token.of_provider}); {!memory} serves tests,
+    the CLI and the conformance run, and forgets everything when the process exits. Every
+    write is keyed, so repeating one is harmless. *)
 
 open! Core
 open Async_kernel
@@ -68,6 +72,10 @@ type t =
   ; set_swap : Swap_record.t -> unit Deferred.t
   ; find_card_request : string -> Card_core.Ids.Card_id.t option Deferred.t
   ; set_card_request : string -> Card_core.Ids.Card_id.t -> unit Deferred.t
+  ; find_card_token :
+      Card_core.Ids.Card_id.t -> Card_core.Pan_display_token.t option Deferred.t
+  ; set_card_token :
+      Card_core.Ids.Card_id.t -> Card_core.Pan_display_token.t -> unit Deferred.t
   }
 
 (** Hash tables in this process. *)
