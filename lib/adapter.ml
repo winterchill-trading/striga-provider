@@ -962,6 +962,21 @@ let network_code (n : Network.t) =
     Or_error.error_s [%message "Striga does not withdraw to this network" (n : Network.t)]
 ;;
 
+(* The account of this application that holds [iban], if the adapter has seen it. *)
+let own_account_of_iban t iban =
+  Hashtbl.to_alist t.ibans
+  |> List.find_map ~f:(fun (account, i) -> Option.some_if (Iban.equal i iban) account)
+;;
+
+(* The rail the money actually moves on: a SEPA payout to one of this application's own
+   IBANs goes intraledger (see [initiate_striga]). *)
+let effective_rail t (draft : Transfer.t) =
+  match draft.counterparty, draft.rail with
+  | Beneficiary { destination = Bank_account { iban; _ }; _ }, (Sepa_credit | Sepa_instant)
+    when Option.is_some (own_account_of_iban t iban) -> Rail.Intraledger
+  | _ -> draft.rail
+;;
+
 let initiate_striga t ~user_id ~account_id (draft : Transfer.t) ~amount =
   let module B = Beneficiary in
   match draft.counterparty, draft.rail with
@@ -971,11 +986,7 @@ let initiate_striga t ~user_id ~account_id (draft : Transfer.t) ~amount =
        let memo =
          Option.some_if (not (String.is_empty draft.reference)) draft.reference
        in
-       let own =
-         Hashtbl.to_alist t.ibans
-         |> List.find_map ~f:(fun (account, i) ->
-           Option.some_if (Iban.equal i iban) account)
-       in
+       let own = own_account_of_iban t iban in
        (match own with
         | Some destination_account_id ->
           (* Striga refuses SEPA to an IBAN of its own application (31003 "use the
@@ -1112,7 +1123,9 @@ let initiate_transfer t ~from (draft : Transfer.t) =
        let record =
          { Transfer_record.id = draft.id
          ; account = from
-         ; rail = draft.rail
+         ; (* The rail used, so the sandbox's SEPA settlement is not asked for a payout
+              that went intraledger (500 "No banking tx id found"). *)
+           rail = effective_rail t draft
          ; amount = draft.amount
          ; fee
          ; details = draft.details
