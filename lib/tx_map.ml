@@ -3,13 +3,6 @@ open Banking_provider
 open Payments_core
 module Tx = Striga_client.Transaction
 
-let event_id (t : Tx.t) =
-  match t.id, t.tx_type with
-  | Some id, Some ty ->
-    Some (Event_id.of_string (sprintf "tx:%s:%s" id (Tx.Tx_type.to_string ty)))
-  | _ -> None
-;;
-
 let nonzero = function
   | Some s when not (String.equal s "0" || String.is_empty s) -> Some s
   | _ -> None
@@ -20,6 +13,21 @@ let direction (t : Tx.t) =
   | Some _, _ -> Some `In
   | None, Some _ -> Some `Out
   | None, None -> None
+;;
+
+(* A ledger move between two Striga accounts appears on both statements with the same
+   transaction id and type; the credit side gets its own id, or the payer's event would
+   swallow the payee's. *)
+let event_id (t : Tx.t) =
+  match t.id, t.tx_type with
+  | Some id, Some ty ->
+    let side =
+      match ty, direction t with
+      | (Intra_ledger_send | Inter_ledger_send), Some `In -> ":in"
+      | _ -> ""
+    in
+    Some (Event_id.of_string (sprintf "tx:%s:%s%s" id (Tx.Tx_type.to_string ty) side))
+  | _ -> None
 ;;
 
 let pending_otp (t : Tx.t) =

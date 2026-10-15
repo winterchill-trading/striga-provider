@@ -146,3 +146,31 @@ let%expect_test "an initiation waiting for its OTP is not a transfer update yet"
     (Submitted)
     |}]
 ;;
+
+let%expect_test "an intraledger move gives the payer and the payee different event ids" =
+  let debit = Fixture.json "docs-webhook-intra.json" in
+  (* The payee's statement carries the same id and type, with a credit instead. *)
+  let credit =
+    match debit with
+    | `Assoc fields ->
+      `Assoc
+        (List.map fields ~f:(fun (k, v) ->
+           match k with
+           | "debit" -> "credit", v
+           | "accountId" -> k, `String "ffff0000000000000000000000000044"
+           | _ -> k, v))
+    | j -> j
+  in
+  List.iter [ debit; credit ] ~f:(fun j ->
+    let t = Striga_client.Transaction.t_of_yojson j in
+    print_s
+      [%sexp
+        (Tx_map.event_id t : Event_id.t option)
+        , (Tx_map.direction t : [ `In | `Out ] option)
+        , (Tx_map.outgoing_update t : Transfer_update.t option)]);
+  [%expect
+    {|
+    ((tx:00000000-0000-4000-8000-000000000064:INTRA_LEDGER_SEND) (Out) (Settled))
+    ((tx:00000000-0000-4000-8000-000000000064:INTRA_LEDGER_SEND:in) (In) ())
+    |}]
+;;
