@@ -34,10 +34,19 @@ open Banking_provider
 module Config : sig
   type t =
     { poll_interval : Time_ns.Span.t
-    ; provisioning_timeout : Time_ns.Span.t
-    (** how long [open_account] waits for Striga to provision an account (EUR accounts
-        appear up to minutes after KYC approval) and [simulate_deposit] waits for the
-        credit *)
+    ; account_retry : Time_ns.Span.t
+    (** how long [open_account] keeps looking for the account Striga opened on KYC
+        approval (crypto accounts are listed within seconds; EUR and USDC once the user
+        has an SCA session) *)
+    ; deposit_timeout : Time_ns.Span.t
+    (** how long [simulate_deposit] waits for the asynchronous credit *)
+    ; sandbox_code : string
+    (** the sandbox's fixed one-time code, with which the adapter answers its own SMS
+        login and the e-mail and mobile checks; used only against the sandbox host *)
+    ; payment_account_consent : [ `Record of string option | `By_application ]
+    (** [`Record terms_version]: before opening the EUR account (Striga's Payment
+        Account), record the customer's acceptance of its terms with [end_user_ip] unless
+        one is already recorded. [`By_application]: the application records it. *)
     ; statement_window : Time_ns.Span.t (** how far back polls read statements *)
     ; end_user_ip : string (** sent with confirmations; Striga checks its region *)
     ; email_for : Kyc_core.Customer_id.t -> email:string -> string
@@ -48,9 +57,11 @@ module Config : sig
         calling Striga *)
     }
 
-  (** Polls every 3 s, waits up to 5 minutes for provisioning, reads a day of statements,
-      a documentation IP from the sandbox runs, e-mails made unique by a [+<customer id>]
-      tag on the person's address, [`Manual] settlement and a random 3-D Secure password. *)
+  (** Polls every 3 s, looks for a new account for 30 s, waits a minute for a simulated
+      deposit, the sandbox code [123456], records the Payment Account consent, reads a day
+      of statements, a documentation IP from the sandbox runs, e-mails made unique by a
+      [+<customer id>] tag on the person's address, [`Manual] settlement and a random 3-D
+      Secure password. *)
   val default : t
 
   (** Striga's rule for 3-D Secure passwords: 8-36 characters from letters, digits and the
@@ -87,6 +98,20 @@ val card_consent_started
   -> Card_core.Ids.Card_id.t
   -> challenge_id:string
   -> Sca_challenge.t Or_error.t Deferred.t
+
+(** Striga lists EUR and USDC accounts, and reads them, only while the customer has an SCA
+    session (180 days; a 2FA reset revokes it). Against the sandbox the adapter opens one
+    itself with [sandbox_code] when it needs it. Elsewhere the application does:
+    [start_session] sends the customer an SMS and returns Striga's challenge id, and
+    [complete_session] answers it with the customer's code. *)
+val start_session : t -> Customer_ref.t -> string Or_error.t Deferred.t
+
+val complete_session
+  :  t
+  -> Customer_ref.t
+  -> challenge_id:string
+  -> code:Sensitive.t
+  -> unit Or_error.t Deferred.t
 
 (** Failures inside the poller, which has no caller to return them to. *)
 val background_errors : t -> Error.t list

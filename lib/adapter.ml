@@ -14,7 +14,10 @@ module Swap_record = Store.Swap_record
 module Config = struct
   type t =
     { poll_interval : Time_ns.Span.t
-    ; provisioning_timeout : Time_ns.Span.t
+    ; account_retry : Time_ns.Span.t
+    ; deposit_timeout : Time_ns.Span.t
+    ; sandbox_code : string
+    ; payment_account_consent : [ `Record of string option | `By_application ]
     ; statement_window : Time_ns.Span.t
     ; end_user_ip : string
     ; email_for : Kyc_core.Customer_id.t -> email:string -> string
@@ -59,7 +62,13 @@ module Config = struct
 
   let default =
     { poll_interval = Time_ns.Span.of_sec 3.
-    ; provisioning_timeout = Time_ns.Span.of_min 5.
+    ; (* Crypto accounts are listed seconds after KYC approval; EUR and USDC as soon as
+         the user has an SCA session. A short retry covers both. *)
+      account_retry = Time_ns.Span.of_sec 30.
+    ; (* The simulator credits a deposit asynchronously, within seconds. *)
+      deposit_timeout = Time_ns.Span.of_min 1.
+    ; sandbox_code = "123456"
+    ; payment_account_consent = `Record None
     ; statement_window = Time_ns.Span.day
     ; (* The address the striga-client sandbox runs used; Striga only checks that it is
          outside restricted regions. A service passes its customer's real IP. *)
@@ -389,6 +398,69 @@ let poll_until ~timeout ~every f =
   loop ()
 ;;
 
+(* {2 SCA sessions}
+
+   Striga lists a user's EUR and USDC accounts, and answers [/wallets/get/account] on
+   them, only while the user has an SCA session (a login confirmed with a one-time code; a
+   2FA reset revokes it). Without one the accounts exist but are left out of the listing,
+   and reading one answers 403 [30070] [SCA_REQUIRED]. *)
+
+let start_session t customer =
+  let user_id = Refs.user_id customer in
+  let%bind.Deferred.Or_error (ch : Sc.Sca.Login_challenge.t) =
+    Sc.Sca.login_start t.tr ~user_id ~verification_method:Sms
+  in
+  match ch.challenge_id with
+  | Some id -> return (Ok id)
+  | None -> return (Or_error.error_string "Striga's SMS login returned no challenge id")
+;;
+
+let complete_session t customer ~challenge_id ~code =
+  Sc.Sca.login_complete
+    t.tr
+    ~user_id:(Refs.user_id customer)
+    ~verification_method:Sms
+    ~ip:t.config.end_user_ip
+    ~challenge_id
+    ~code:(Sensitive.reveal code)
+    ()
+  |> Deferred.Or_error.ignore_m
+;;
+
+(* The adapter can answer its own login only where the code is known: the sandbox. *)
+let open_session t ~user_id =
+  if not (is_sandbox t)
+  then
+    return
+      (Or_error.error_string
+         "Striga needs an SCA session for EUR and USDC accounts: open one with \
+          start_session and complete_session and the customer's SMS code")
+  else
+    (let customer = Refs.customer ~user_id in
+     let%bind.Deferred.Or_error challenge_id = start_session t customer in
+     complete_session
+       t
+       customer
+       ~challenge_id
+       ~code:(Sensitive.of_string t.config.sandbox_code))
+    |> Deferred.Or_error.tag ~tag:"opening an SCA session"
+;;
+
+(* Runs [f]; when Striga answers that the user has no SCA session, opens one (sandbox) and
+   runs [f] once more. *)
+let with_session t ~user_id f =
+  match%bind f () with
+  | Error e when Sc.Api_error.is_sca_session_required e ->
+    (match%bind open_session t ~user_id with
+     | Ok () -> f ()
+     | Error e' -> return (Error (Error.of_list [ e; e' ])))
+  | r -> return r
+;;
+
+let wallet_account t ~user_id ~account_id =
+  with_session t ~user_id (fun () -> Sc.Wallet.get_account t.tr ~user_id ~account_id)
+;;
+
 let user_created_at (u : Sc.User.t) = Striga_time.parse_or ~default:(now ()) u.created_at
 let striga_error_code = Sc.Api_error.code_of_error
 
@@ -636,32 +708,11 @@ let accounts t customer =
   List.filter_map accounts ~f:(fun a -> to_account t ~user_id a |> Result.ok)
 ;;
 
-let open_account t customer currency =
-  let user_id = Refs.user_id customer in
-  match Units.striga_of_currency currency with
-  | Error _ as e -> return e
-  | Ok code ->
-    (* Striga opens one account per enabled currency itself once KYC is approved (EUR and
-       USDC minutes after the crypto ones); opening is waiting for it. *)
-    let%bind.Deferred.Or_error a =
-      poll_until
-        ~timeout:t.config.provisioning_timeout
-        ~every:(Time_ns.Span.of_sec 3.)
-        (fun () ->
-           let%map.Deferred.Or_error accounts = striga_accounts t ~user_id in
-           List.find accounts ~f:(fun (a : Sc.Wallet.Account.t) ->
-             Option.equal String.equal a.currency (Some code)))
-      |> Deferred.Or_error.tag_s
-           ~tag:[%message "Striga has not provisioned the account" code user_id]
-    in
-    return (to_account t ~user_id a)
-;;
-
 let get_account t account =
   match Refs.account_parts account with
   | Error _ as e -> return e
   | Ok (user_id, account_id) ->
-    let%map.Deferred.Or_error a = Sc.Wallet.get_account t.tr ~user_id ~account_id in
+    let%map.Deferred.Or_error a = wallet_account t ~user_id ~account_id in
     user_id, a
 ;;
 
@@ -676,7 +727,7 @@ let enrich_account t account =
   | Error _ as e -> return e
   | Ok (user_id, account_id) ->
     let%bind.Deferred.Or_error e = Sc.Wallet.enrich_account t.tr ~user_id ~account_id in
-    let%bind.Deferred.Or_error a = Sc.Wallet.get_account t.tr ~user_id ~account_id in
+    let%bind.Deferred.Or_error a = wallet_account t ~user_id ~account_id in
     return
       (let%map.Or_error acc = to_account t ~user_id a in
        let extra =
@@ -689,11 +740,66 @@ let enrich_account t account =
        acc)
 ;;
 
+(* Striga's EUR account is the Payment Account; its terms are accepted once per user. *)
+let record_payment_account_consent t ~user_id =
+  match t.config.payment_account_consent with
+  | `By_application -> return (Ok ())
+  | `Record terms_version ->
+    let%bind.Deferred.Or_error current = Sc.User.payment_account_consent t.tr ~user_id in
+    (match current.payment_account_consent with
+     | Some { Sc.User.Payment_account_consent.accepted = true; _ } -> return (Ok ())
+     | Some { accepted = false; _ } | None ->
+       Sc.User.set_payment_account_consent
+         t.tr
+         ~user_id
+         ~accepted:true
+         ?terms_version
+         ~ip:t.config.end_user_ip
+         ()
+       |> Deferred.Or_error.ignore_m)
+    |> Deferred.Or_error.tag ~tag:"recording the Payment Account consent"
+;;
+
+let session_gated code = String.equal code "EUR" || String.equal code "USDC"
+
+let open_account t customer currency =
+  let user_id = Refs.user_id customer in
+  match Units.striga_of_currency currency with
+  | Error _ as e -> return e
+  | Ok code ->
+    (* Striga opens one account per enabled currency itself on KYC approval; opening is
+       finding it. EUR and USDC are listed only for a user with an SCA session. *)
+    let find () =
+      let%map.Deferred.Or_error accounts = striga_accounts t ~user_id in
+      List.find accounts ~f:(fun (a : Sc.Wallet.Account.t) ->
+        Option.equal String.equal a.currency (Some code))
+    in
+    let%bind.Deferred.Or_error () =
+      if String.equal code "EUR"
+      then record_payment_account_consent t ~user_id
+      else return (Ok ())
+    in
+    let%bind.Deferred.Or_error listed = find () in
+    let%bind.Deferred.Or_error a =
+      match listed with
+      | Some a -> return (Ok a)
+      | None ->
+        let%bind.Deferred.Or_error () =
+          if session_gated code then open_session t ~user_id else return (Ok ())
+        in
+        poll_until ~timeout:t.config.account_retry ~every:(Time_ns.Span.of_sec 2.) find
+        |> Deferred.Or_error.tag_s
+             ~tag:[%message "Striga lists no account in this currency" code user_id]
+    in
+    let%bind.Deferred.Or_error acc = return (to_account t ~user_id a) in
+    if String.equal code "EUR" then enrich_account t acc.id else return (Ok acc)
+;;
+
 let statement t account ~from ~until =
   match Refs.account_parts account with
   | Error _ as e -> return e
   | Ok (user_id, account_id) ->
-    let%bind.Deferred.Or_error a = Sc.Wallet.get_account t.tr ~user_id ~account_id in
+    let%bind.Deferred.Or_error a = wallet_account t ~user_id ~account_id in
     let%bind.Deferred.Or_error txs =
       read_statement t ~user_id ~account_id ~start:from ~stop:until
     in
@@ -884,7 +990,7 @@ let initiate_striga t ~user_id ~account_id (draft : Transfer.t) ~amount =
     (match b.destination, network_code network with
      | _, (Error _ as e) -> return e
      | Crypto { address; memo = _ }, Ok net ->
-       let%bind.Deferred.Or_error a = Sc.Wallet.get_account t.tr ~user_id ~account_id in
+       let%bind.Deferred.Or_error a = wallet_account t ~user_id ~account_id in
        let currency = Option.value a.currency ~default:"" in
        let%bind.Deferred.Or_error w =
          Sc.Payment.whitelist_address
@@ -1254,7 +1360,7 @@ let quote_swap t ~from ~to_ ~sell =
     return (Or_error.error_string "a swap moves between two accounts of one customer")
   | Ok _, Ok (user_id, to_account_id) ->
     let%bind.Deferred.Or_error dest =
-      Sc.Wallet.get_account t.tr ~user_id ~account_id:to_account_id
+      wallet_account t ~user_id ~account_id:to_account_id
     in
     let%bind.Deferred.Or_error rates = Sc.Exchange.rates t.tr in
     return
@@ -1652,7 +1758,7 @@ let simulate_deposit t ~account ~(rail : Rail.t) amount =
       in
       let%bind.Deferred.Or_error tx =
         poll_until
-          ~timeout:t.config.provisioning_timeout
+          ~timeout:t.config.deposit_timeout
           ~every:(Time_ns.Span.of_sec 2.)
           (fun () ->
              let start, stop = statement_range t in
@@ -1683,7 +1789,7 @@ let simulate_kyc_decision t customer (decision : Sandbox.Kyc_decision.t) =
   sandbox_only t (fun () ->
     let user_id = Refs.user_id customer in
     track_user t ~user_id;
-    let code = "123456" in
+    let code = t.config.sandbox_code in
     let%bind.Deferred.Or_error k = Sc.User.kyc_status t.tr ~user_id in
     (* Striga decides KYC only for a user with a verified e-mail and mobile and a started
        KYC; the sandbox accepts its fixed code for both. *)
