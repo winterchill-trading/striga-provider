@@ -37,3 +37,29 @@ let%expect_test "a card display token survives a restart through the store" =
   print_s [%sexp (Result.is_error result : bool)];
   [%expect {| true |}]
 ;;
+
+let%expect_test "the default 3-D Secure password meets Striga's rule" =
+  let ok =
+    List.init 200 ~f:(fun _ -> Adapter.Config.random_password ())
+    |> List.for_all ~f:Adapter.Config.valid_3ds_password
+  in
+  print_s [%sexp (ok : bool)];
+  List.iter
+    [ "Wc#1b4e28ba-2fa19z"
+    ; "short1!A"
+    ; "Walk#Pass2026"
+    ; "nouppercase1!"
+    ; "Pass1234Test@!"
+    ]
+    ~f:(fun p -> printf "%s %b\n" p (Adapter.Config.valid_3ds_password p));
+  [%expect
+    {|
+    true
+    Wc#1b4e28ba-2fa19z false
+    short1!A true
+    Walk#Pass2026 true
+    nouppercase1! false
+    Pass1234Test@! false
+    |}];
+  return ()
+;;

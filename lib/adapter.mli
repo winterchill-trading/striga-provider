@@ -43,13 +43,25 @@ module Config : sig
     ; email_for : Kyc_core.Customer_id.t -> email:string -> string
     (** the e-mail registered at Striga, which must be unique per user *)
     ; sandbox_settlement : [ `Immediate | `Manual ]
-    ; card_3ds_password : unit -> string (** 8-36 characters, for new virtual cards *)
+    ; card_3ds_password : unit -> string
+    (** for new virtual cards; must pass {!valid_3ds_password}, or issuing fails before
+        calling Striga *)
     }
 
   (** Polls every 3 s, waits up to 5 minutes for provisioning, reads a day of statements,
       a documentation IP from the sandbox runs, e-mails made unique by a [+<customer id>]
       tag on the person's address, [`Manual] settlement and a random 3-D Secure password. *)
   val default : t
+
+  (** Striga's rule for 3-D Secure passwords: 8-36 characters from letters, digits and the
+      symbols listed in Striga's card reference (the double quote, backslash and
+      [!#;:?&*()+=/,.[]{}]; no hyphen or at sign). Striga also wants a strong one, so this
+      asks for an upper-case letter, a lower-case letter, a digit and a symbol. *)
+  val valid_3ds_password : string -> bool
+
+  (** The default [card_3ds_password]: a fresh random password that passes
+      {!valid_3ds_password}. *)
+  val random_password : unit -> string
 end
 
 type t

@@ -36,9 +36,25 @@ module Config = struct
     | None -> email
   ;;
 
+  (* Striga's documented 3-D Secure charset: no hyphen, underscore, at sign or space. *)
+  let three_ds_symbols = "!\"#;:?&*()+=/\\,.[]{}"
+
+  let valid_3ds_password p =
+    let len = String.length p in
+    len >= 8
+    && len <= 36
+    && String.for_all p ~f:(fun c -> Char.is_alphanum c || String.mem three_ds_symbols c)
+    && String.exists p ~f:Char.is_uppercase
+    && String.exists p ~f:Char.is_lowercase
+    && String.exists p ~f:Char.is_digit
+    && String.exists p ~f:(fun c -> String.mem three_ds_symbols c)
+  ;;
+
   let random_password () =
-    (* Upper, lower, digit and symbol, as Striga's 3-D Secure password rule wants. *)
-    sprintf "Wc#%s9z" (String.prefix (Sc.Transport.uuid_v4 ()) 13)
+    (* Upper, lower, digit and symbol. The UUID's hyphens are outside Striga's charset,
+       which is why the first version of this default was refused; keep hex digits only. *)
+    let hex = String.filter (Sc.Transport.uuid_v4 ()) ~f:Char.is_alphanum in
+    sprintf "Wc#%s9z!" (String.prefix hex 14)
   ;;
 
   let default =
@@ -1360,12 +1376,23 @@ let issue_virtual_card t ~request_id customer ~account =
            (String.concat ~sep:" " (List.filter_opt [ user.first_name; user.last_name ]))
            26
        in
+       let password = t.config.card_3ds_password () in
+       let%bind.Deferred.Or_error () =
+         if Config.valid_3ds_password password
+         then return (Ok ())
+         else
+           return
+             (Or_error.error_string
+                "the configured 3-D Secure password does not meet Striga's rule (8-36 \
+                 characters from A-Z a-z 0-9 and !\"#;:?&*()+=/\\,.[]{}, with upper, \
+                 lower, digit and symbol)")
+       in
        let%bind.Deferred.Or_error c =
          Sc.Card.create
            t.tr
            ~user_id
            ~name_on_card
-           ~three_d_secure_password:(t.config.card_3ds_password ())
+           ~three_d_secure_password:password
            ~type_:Virtual
            ~account_id_to_link:account_id
            ()
