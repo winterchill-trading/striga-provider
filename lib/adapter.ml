@@ -1198,22 +1198,30 @@ let confirm_transfer t (cr : Challenge_record.t) transfer_id ~code =
          ()
      with
      | Ok tx ->
+       (* The confirmation answers with the first ledger entry: SEPA_PAYOUT_INITIATED
+          (submitted) or, between Striga users, the final INTRA_LEDGER_SEND (settled).
+          Publishing under that entry's id keeps a later poll or webhook from repeating
+          it. Without a usable entry the event gets an id of its own, so the entry's
+          update is still published when it is seen. *)
+       let update, id =
+         match Tx_map.outgoing_update tx, Tx_map.event_id tx with
+         | Some u, Some id -> u, Event_id.to_string id
+         | _ -> Transfer_update.Submitted, "submitted:" ^ Transfer.Id.to_string r.id
+       in
        let r =
          { r with
            provider_ref = Option.first_some tx.id r.provider_ref
-         ; status = Submitted
+         ; status = Option.value (status_of_update update) ~default:Submitted
          ; updated_at = now ()
          }
        in
        let%bind () = t.store.set_transfer r in
-       Option.iter (Tx_map.event_id tx) ~f:(fun id ->
-         transfer_event
-           t
-           r
-           ~id:(Event_id.to_string id)
-           ~provider_ref:(Option.value r.provider_ref ~default:"")
-           Submitted;
-         Hash_set.add t.published id);
+       transfer_event
+         t
+         r
+         ~id
+         ~provider_ref:(Option.value r.provider_ref ~default:"")
+         update;
        let%map () = sandbox_settle t r in
        Ok `Accepted
      | Error e ->
