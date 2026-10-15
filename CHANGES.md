@@ -41,6 +41,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Webhook notices on the known channels with no event of their own (`ACCOUNT_ENRICHED` and
+  the other `type` bodies on `/tx`) were refused as an unhandled channel, so Striga
+  delivered each one again and again. They are acknowledged now, and an enrichment's IBAN
+  is remembered for intraledger routing.
+
 - A SEPA payout routed intraledger (to one of the application's own IBANs) was recorded
   with the SEPA rail, so the sandbox's immediate settlement asked `/simulate/sepa` for it
   and got `500 "No banking tx id found"`. The transfer now records the rail used.
