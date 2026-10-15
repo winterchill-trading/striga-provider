@@ -1776,7 +1776,25 @@ let events_of_webhook t (e : Sc.Webhook.Event.t) ~body =
       publish t (event ~id:("ping:" ^ body_digest body) ~at:(now ()) Ping);
       return (Ok ())
     | Other { path; _ } ->
-      return (Or_error.error_s [%message "unhandled webhook channel" path])
+      (* Notices on the known channels (ACCOUNT_ENRICHED and the other [type] bodies on
+         /tx, for example) carry no event of their own. Refusing them made Striga
+         redeliver each one; they are acknowledged, and an enrichment teaches the adapter
+         the IBAN. *)
+      (match Sc.Webhook.notice ~path ~body with
+       | Ok
+           (Some (Account_enriched { account_id = Some account_id; iban = Some iban; _ }))
+         ->
+         Option.iter
+           (Iban.of_string iban |> Result.ok)
+           ~f:(fun data -> Hashtbl.set t.ibans ~key:account_id ~data);
+         return (Ok ())
+       | Ok (Some _) -> return (Ok ())
+       | Ok None ->
+         if List.exists [ "/kyc"; "/kyb"; "/tx"; "/card/watch"; "/ping" ] ~f:(fun c ->
+              String.is_suffix (String.chop_suffix_if_exists path ~suffix:"/") ~suffix:c)
+         then return (Ok ())
+         else return (Or_error.error_s [%message "unhandled webhook channel" path])
+       | Error _ as e -> return e)
   in
   let events = finish () in
   Or_error.map result ~f:(fun () -> events)
