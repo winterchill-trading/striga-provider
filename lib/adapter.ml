@@ -1207,6 +1207,17 @@ let sandbox_settle t (r : Transfer_record.t) =
 ;;
 
 let wrong_code_codes = [ "41009"; "41010" ]
+
+(* A code that is not six digits fails Striga's field validation instead: 400 00002
+   "Invalid fields --> Invalid verificationCode". It is a wrong code all the same. *)
+let is_wrong_code e =
+  match striga_error_code e with
+  | Some c when List.mem wrong_code_codes c ~equal:String.equal -> true
+  | Some "00002" ->
+    String.is_substring (Error.to_string_hum e) ~substring:"verificationCode"
+  | _ -> false
+;;
+
 let insufficient_codes = [ "61004"; "31090" ]
 
 let order_amount json side =
@@ -1268,8 +1279,7 @@ let confirm_transfer t (cr : Challenge_record.t) transfer_id ~code =
        Ok `Accepted
      | Error e ->
        (match striga_error_code e with
-        | Some c when List.mem wrong_code_codes c ~equal:String.equal ->
-          return (Ok `Wrong_code)
+        | _ when is_wrong_code e -> return (Ok `Wrong_code)
         | Some c when List.mem insufficient_codes c ~equal:String.equal ->
           let r = { r with status = Failed Insufficient_funds; updated_at = now () } in
           let%map () = t.store.set_transfer r in
@@ -1321,8 +1331,7 @@ let confirm_swap t (cr : Challenge_record.t) swap_id ~code =
        return (Ok `Accepted)
      | Error e ->
        (match striga_error_code e with
-        | Some c when List.mem wrong_code_codes c ~equal:String.equal ->
-          return (Ok `Wrong_code)
+        | _ when is_wrong_code e -> return (Ok `Wrong_code)
         | _ ->
           let%map () = t.store.set_swap { s with executed = true } in
           publish
@@ -1355,7 +1364,7 @@ let confirm_card_details t (cr : Challenge_record.t) card ~code =
   | Error e ->
     return
       (match striga_error_code e with
-       | Some c when List.mem wrong_code_codes c ~equal:String.equal -> Ok `Wrong_code
+       | _ when is_wrong_code e -> Ok `Wrong_code
        | _ -> Error e)
 ;;
 
