@@ -3,9 +3,8 @@ open! Async
 open Banking_provider
 module Suite = Conformance.Make (Striga_provider.Adapter) (Striga_provider.Adapter)
 
-(* The profile striga-client's live walk was given an EUR account with: an Estonian
-   resident with an Estonian mobile. With the suite's German default person the sandbox
-   provisioned only the crypto accounts. Names stay synthetic. *)
+(* An Estonian resident with an Estonian mobile, as in striga-client's live walk. Names
+   stay synthetic. *)
 let person ~run_id =
   let open Kyc_core in
   let stamp = String.filter run_id ~f:Char.is_digit in
@@ -40,8 +39,9 @@ let config ~run_id =
   let base = Conformance.Config.default ~run_id in
   { base with
     person = person ~run_id
-  ; (* EUR accounts appear minutes after a simulated KYC approval. *)
-    timeout = Time_ns.Span.of_min 6.
+  ; (* Accounts are listed within seconds of KYC approval (EUR and USDC once the adapter
+       has opened an SCA session) and simulated credits land within seconds. *)
+    timeout = Time_ns.Span.of_min 2.
   ; poll_interval = Time_ns.Span.of_sec 3.
   ; (* The sandbox's fixed OTP. *)
     sca_code = Sensitive.of_string "123456"
@@ -61,8 +61,6 @@ let run () =
         { Striga_provider.Adapter.Config.default with
           sandbox_settlement = `Immediate
         ; email_for
-        ; (* The suite's timeout should decide, not the adapter's shorter default. *)
-          provisioning_timeout = (config ~run_id).timeout
         }
       ()
   with
