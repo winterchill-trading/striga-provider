@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `Config.auto_session`: whether the adapter answers Striga's SMS login itself on the
+  sandbox, asked at each use (a runtime switch); when it does not, reads that need a
+  session fail with an error `is_session_required` recognizes.
+- `begin_session` (the challenge with Striga's `dateExpires`) and `is_session_required`,
+  so an application can prompt the customer for the login code.
+
 - `start_session` and `complete_session`: open the customer's SCA session (SMS login),
   which Striga needs before it lists or reads EUR and USDC accounts.
 - `Config.sandbox_code`, `Config.account_retry`, `Config.deposit_timeout` and
