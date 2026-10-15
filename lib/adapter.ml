@@ -65,7 +65,6 @@ type t =
   ; accounts_seen : Account_ref.t Hash_set.t
   ; cards_seen : (string, string) Hashtbl.t (** card id to user id *)
   ; ibans : (string, Iban.t) Hashtbl.t (** by account id, for SEPA deposits *)
-  ; pan_tokens : (string, Pan_display_token.t) Hashtbl.t (** by card id *)
   ; mutable captures : Event.t Queue.t list
   (** webhook ingestion collects what one delivery publishes *)
   ; mutable polling : bool
@@ -94,7 +93,6 @@ let create ?(config = Config.default) ?(store = Store.memory ()) tr =
   ; accounts_seen = Hash_set.create (module Account_ref)
   ; cards_seen = Hashtbl.create (module String)
   ; ibans = Hashtbl.create (module String)
-  ; pan_tokens = Hashtbl.create (module String)
   ; captures = []
   ; polling = false
   ; errors = []
@@ -1165,7 +1163,7 @@ let confirm_swap t (cr : Challenge_record.t) swap_id ~code =
 ;;
 
 let confirm_card_details t (cr : Challenge_record.t) card ~code =
-  match%map
+  match%bind
     Sc.Card.confirm_consent
       t.tr
       ~user_id:cr.user_id
@@ -1179,13 +1177,14 @@ let confirm_card_details t (cr : Challenge_record.t) card ~code =
          ~expires_at:(Time_ns.add (now ()) (Time_ns.Span.of_hr 24.))
      with
      | Ok token ->
-       Hashtbl.set t.pan_tokens ~key:(Ids.Card_id.to_string card) ~data:token;
+       let%map () = t.store.set_card_token card token in
        Ok `Accepted
-     | Error _ as e -> Or_error.map e ~f:(fun _ -> `Accepted))
+     | Error _ as e -> return (Or_error.map e ~f:(fun _ -> `Accepted)))
   | Error e ->
-    (match striga_error_code e with
-     | Some c when List.mem wrong_code_codes c ~equal:String.equal -> Ok `Wrong_code
-     | _ -> Error e)
+    return
+      (match striga_error_code e with
+       | Some c when List.mem wrong_code_codes c ~equal:String.equal -> Ok `Wrong_code
+       | _ -> Error e)
 ;;
 
 let confirm_sca t id ~code =
@@ -1445,7 +1444,7 @@ let set_card_limits t id limits =
 ;;
 
 let card_details_token t id =
-  match Hashtbl.find t.pan_tokens (Ids.Card_id.to_string id) with
+  match%bind t.store.find_card_token id with
   | Some token when not (Pan_display_token.is_expired token ~now:(now ())) ->
     return (Ok (Sca_challenge.Or_challenge.Done token))
   | _ ->
