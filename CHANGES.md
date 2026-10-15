@@ -41,6 +41,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A SEPA payout routed intraledger (to one of the application's own IBANs) was recorded
+  with the SEPA rail, so the sandbox's immediate settlement asked `/simulate/sepa` for it
+  and got `500 "No banking tx id found"`. The transfer now records the rail used.
+
 - A simulated deposit was never found: the sandbox's memo is
   `SEPA_PAYIN_COMPLETED <amount> EUR <reference>`, not the bare reference. The reference
   is now matched at the end of the memo.
